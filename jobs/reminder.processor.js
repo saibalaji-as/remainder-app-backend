@@ -1,53 +1,43 @@
-const { queue } = require('./reminder.queue');
+const reminderQueue = require('./reminder.queue');
 const smsService = require('../services/sms.service');
 const emailService = require('../services/email.service');
-const reminderService = require('../services/reminder.service');
+const supabase = require('../config/supabase');
 
-queue.process(async (job) => {
-  const {
-    reminderId,
-    channel,
-    contactPhone,
-    contactEmail,
-    appointmentTitle,
-    scheduledAt,
-  } = job.data;
+reminderQueue.process(async (job) => {
+  const { reminderId, appointmentId, channel } = job.data;
 
-  if (channel === 'sms') {
-    await smsService.sendReminderSms(reminderId, {
-      contact: { name: appointmentTitle, phone: contactPhone },
-      scheduled_at: scheduledAt,
-      notes: null,
-    });
-  } else if (channel === 'email') {
-    await emailService.sendReminderEmail({
-      to: contactEmail,
-      contactName: appointmentTitle,
-      scheduledAt,
-      notes: null,
-    });
-  } else if (channel === 'both') {
-    await Promise.all([
-      smsService.sendReminderSms(reminderId, {
-        contact: { name: appointmentTitle, phone: contactPhone },
-        scheduled_at: scheduledAt,
-        notes: null,
-      }),
-      emailService.sendReminderEmail({
-        to: contactEmail,
-        contactName: appointmentTitle,
-        scheduledAt,
-        notes: null,
-      }),
-    ]);
+  const { data: appointment, error } = await supabase
+    .from('appointments')
+    .select('*, contacts(*)')
+    .eq('id', appointmentId)
+    .single();
+
+  if (error) throw error;
+  if (!appointment) throw new Error('Appointment not found');
+
+  if (appointment.status === 'cancelled') {
+    await supabase
+      .from('reminders')
+      .update({ status: 'skipped' })
+      .eq('id', reminderId);
+    return { skipped: true };
   }
 
-  await reminderService.updateStatus(reminderId, 'sent');
+  if (channel === 'sms') {
+    await smsService.sendReminderSms(reminderId, appointment);
+  } else if (channel === 'email') {
+    await emailService.sendReminderEmail({
+      to: appointment.contacts.email,
+      contactName: appointment.contacts.name,
+      scheduledAt: appointment.scheduled_at,
+    });
+  }
+
+  console.log('✅ Reminder job ' + job.id + ' completed');
 });
 
-queue.on('failed', (job, err) => {
-  reminderService.updateStatus(job.data.reminderId, 'failed');
-  console.error(err);
+reminderQueue.on('failed', (job, err) => {
+  console.error('❌ Reminder job ' + job.id + ' failed: ' + err.message);
 });
 
-module.exports = { queue };
+module.exports = reminderQueue;

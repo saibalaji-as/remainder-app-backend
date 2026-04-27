@@ -1,10 +1,27 @@
 const Bull = require('bull');
-const redisConfig = require('../config/redis');
+const redis = require('../config/redis');
+const Redis = require('ioredis');
 
-const queue = new Bull('reminders', { redis: redisConfig });
-
-async function addReminderJob(data, delayMs) {
-  return queue.add(data, { attempts: 3, delay: delayMs });
+function createRedisClient() {
+  return new Redis(process.env.REDIS_URL, {
+    maxRetriesPerRequest: null,
+    tls: { rejectUnauthorized: false },
+    enableReadyCheck: false,
+  });
 }
 
-module.exports = { queue, addReminderJob };
+const reminderQueue = new Bull('reminders', {
+  createClient(type) {
+    switch (type) {
+      case 'client':
+        return redis;
+      case 'bclient':
+      case 'subscriber':
+        return createRedisClient();
+      default:
+        return redis;
+    }
+  },
+});
+
+module.exports = reminderQueue;

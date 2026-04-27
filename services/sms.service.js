@@ -16,11 +16,15 @@ function buildMessage(contactName, scheduledAt, notes) {
 }
 
 async function sendReminderSms(reminderId, appointment) {
-  const { contact, scheduled_at } = appointment;
+  const contact = appointment.contacts || appointment.contact;
+  const { scheduled_at } = appointment;
   const message = buildMessage(contact.name, scheduled_at, appointment.notes);
 
+  // Normalize to E.164 — prepend +91 if no country code present
+  const phone = contact.phone.startsWith('+') ? contact.phone : `+91${contact.phone}`;
+
   try {
-    await sendSms({ to: contact.phone, message });
+    await sendSms({ to: phone, message });
 
     const { data, error } = await supabase
       .from('reminders')

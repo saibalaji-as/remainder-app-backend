@@ -1,5 +1,5 @@
 const supabase = require('../config/supabase');
-const { addReminderJob } = require('../jobs/reminder.queue');
+const { scheduleReminders } = require('../services/reminder.service');
 
 const createAppointment = async ({ tenantId, contactId, title, scheduledAt, reminderChannel }) => {
   const { data, error } = await supabase
@@ -9,42 +9,12 @@ const createAppointment = async ({ tenantId, contactId, title, scheduledAt, remi
     .single();
   if (error) throw error;
 
-  const appointment = data;
+  // Fire-and-forget: schedule reminders without blocking the response
+  console.log('[scheduleReminders] Triggering for appointment:', data.id, 'at:', data.scheduled_at);
+  scheduleReminders(data.id, data.scheduled_at)
+    .catch(err => console.error('[scheduleReminders] Error:', err.message, err.stack));
 
-  const { data: reminderData, error: reminderError } = await supabase
-    .from('reminders')
-    .insert({ appointment_id: appointment.id, channel: reminderChannel, status: 'pending', scheduled_at: scheduledAt })
-    .select()
-    .single();
-  if (reminderError) throw reminderError;
-
-  const delay = new Date(scheduledAt).getTime() - Date.now() - 24 * 60 * 60 * 1000;
-  await addReminderJob(
-    {
-      reminderId: reminderData.id,
-      appointmentId: appointment.id,
-      tenantId,
-      channel: reminderChannel,
-      scheduledAt,
-    },
-    delay
-  );
-
-  return appointment;
+  return data;
 };
 
-const scheduleReminderJob = async (appointment) => {
-  const delay = new Date(appointment.scheduled_at).getTime() - Date.now() - 24 * 60 * 60 * 1000;
-  const job = await addReminderJob(
-    {
-      appointmentId: appointment.id,
-      tenantId: appointment.tenant_id,
-      channel: appointment.reminder_channel,
-      scheduledAt: appointment.scheduled_at,
-    },
-    delay
-  );
-  return job;
-};
-
-module.exports = { createAppointment, scheduleReminderJob };
+module.exports = { createAppointment };

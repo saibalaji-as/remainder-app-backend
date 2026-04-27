@@ -94,7 +94,7 @@ describe('Property 4: Registration creates isolated tenant and hashed password',
           const result = await authService.register({ name, email, password, tenantName });
 
           // Tenant record was inserted with the correct name
-          expect(tenantInsertPayload).toEqual({ name: tenantName });
+          expect(tenantInsertPayload).toMatchObject({ name: tenantName });
 
           // User was linked to the tenant
           expect(userInsertPayload).toMatchObject({

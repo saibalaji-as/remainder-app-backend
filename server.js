@@ -11,6 +11,10 @@ app.use((err, req, res, next) => {
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
+  
+  // Load processor to start consuming jobs
+  require('./jobs/reminder.processor');
+  console.log('⚙️ Reminder job processor started');
 });
 
 module.exports = app;
