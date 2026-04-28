@@ -9,6 +9,21 @@ const router = Router();
 
 router.use(authMiddleware, tenantMiddleware);
 
+router.get('/subscribe', async (req, res) => {
+  try {
+    const supabase = require('../config/supabase');
+    const { data, error } = await supabase
+      .from('subscriptions')
+      .select('*')
+      .eq('tenant_id', req.tenantId)
+      .maybeSingle();
+    if (error) throw error;
+    return res.status(200).json({ subscription: data ?? null });
+  } catch (err) {
+    return res.status(500).json({ error: err.message });
+  }
+});
+
 router.post(
   '/subscribe',
   [

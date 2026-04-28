@@ -1,4 +1,3 @@
-const supabase = require('../config/supabase');
 const appointmentService = require('../services/appointment.service');
 
 async function create(req, res, next) {
@@ -18,11 +17,7 @@ async function create(req, res, next) {
 
 async function list(req, res, next) {
   try {
-    const { data, error } = await supabase
-      .from('appointments')
-      .select('*, contacts(*)')
-      .eq('tenant_id', req.tenantId);
-    if (error) throw error;
+    const data = await appointmentService.listAppointments(req.tenantId);
     return res.json(data);
   } catch (err) {
     return next(err);
@@ -31,13 +26,7 @@ async function list(req, res, next) {
 
 async function getById(req, res, next) {
   try {
-    const { data, error } = await supabase
-      .from('appointments')
-      .select('*')
-      .eq('id', req.params.id)
-      .eq('tenant_id', req.tenantId)
-      .single();
-    if (error) throw error;
+    const data = await appointmentService.getAppointmentById(req.params.id, req.tenantId);
     if (!data) return res.status(404).json({ message: 'Not found' });
     return res.json(data);
   } catch (err) {
@@ -47,14 +36,7 @@ async function getById(req, res, next) {
 
 async function update(req, res, next) {
   try {
-    const { data, error } = await supabase
-      .from('appointments')
-      .update(req.body)
-      .eq('id', req.params.id)
-      .eq('tenant_id', req.tenantId)
-      .select()
-      .single();
-    if (error) throw error;
+    const data = await appointmentService.updateAppointment(req.params.id, req.tenantId, req.body);
     if (!data) return res.status(404).json({ message: 'Not found' });
     return res.json(data);
   } catch (err) {
@@ -64,15 +46,7 @@ async function update(req, res, next) {
 
 async function remove(req, res, next) {
   try {
-    const { data, error } = await supabase
-      .from('appointments')
-      .delete()
-      .eq('id', req.params.id)
-      .eq('tenant_id', req.tenantId)
-      .select()
-      .single();
-    if (error) throw error;
-    if (!data) return res.status(404).json({ message: 'Not found' });
+    await appointmentService.deleteAppointment(req.params.id, req.tenantId);
     return res.status(204).send();
   } catch (err) {
     return next(err);
