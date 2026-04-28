@@ -16,20 +16,29 @@ const allowedOrigins = (process.env.CORS_ORIGIN || 'http://localhost:4200')
   .split(',')
   .map(o => o.trim());
 
+console.log('CORS allowed origins:', allowedOrigins);
+
 app.use(cors({
   origin: (origin, callback) => {
+    console.log('CORS request from origin:', origin);
     // allow requests with no origin (mobile apps, curl, etc.)
     if (!origin || allowedOrigins.includes(origin)) {
       callback(null, true);
     } else {
+      console.error(`CORS blocked: ${origin} not in allowed list`);
       callback(new Error(`CORS: origin ${origin} not allowed`));
     }
   },
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization'],
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
   credentials: true,
+  preflightContinue: false,
+  optionsSuccessStatus: 204
 }));
 app.use(express.json());
+
+// handle preflight for all routes
+app.options('*', cors());
 
 app.use('/api/auth', authRoutes);
 app.use('/api/tenants', tenantRoutes);
