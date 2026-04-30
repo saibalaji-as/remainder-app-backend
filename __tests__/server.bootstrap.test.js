@@ -48,7 +48,7 @@ describe('server bootstrap', () => {
     listenCallback();
 
     const logMessages = consoleSpy.mock.calls.map(call => call[0]);
-    expect(logMessages).toContain('Reminder job processor started');
+    expect(logMessages).toContain('⚙️ Reminder job processor started');
   });
 
   it('logs server running message before processor message', () => {
@@ -58,7 +58,7 @@ describe('server bootstrap', () => {
 
     const logMessages = consoleSpy.mock.calls.map(call => call[0]);
     const serverRunningIdx = logMessages.findIndex(m => typeof m === 'string' && m.includes('Server running on port'));
-    const processorIdx = logMessages.indexOf('Reminder job processor started');
+    const processorIdx = logMessages.indexOf('⚙️ Reminder job processor started');
 
     expect(serverRunningIdx).toBeGreaterThanOrEqual(0);
     expect(processorIdx).toBeGreaterThan(serverRunningIdx);

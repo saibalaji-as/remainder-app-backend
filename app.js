@@ -8,6 +8,7 @@ const contactsRoutes = require('./routes/contacts.routes');
 const appointmentsRoutes = require('./routes/appointments.routes');
 const remindersRoutes = require('./routes/reminders.routes');
 const billingRoutes = require('./routes/billing.routes');
+const statsRoutes = require('./routes/stats');
 
 const app = express();
 
@@ -46,6 +47,7 @@ app.use('/api/contacts', contactsRoutes);
 app.use('/api/appointments', appointmentsRoutes);
 app.use('/api/reminders', remindersRoutes);
 app.use('/api/billing', billingRoutes);
+app.use('/api/dashboard', statsRoutes);
 
 if (process.env.NODE_ENV !== 'production') {
   const testRoutes = require('./routes/test.routes');

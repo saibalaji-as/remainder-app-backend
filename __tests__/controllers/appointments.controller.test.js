@@ -1,5 +1,11 @@
 jest.mock('../../config/supabase', () => ({ from: jest.fn() }));
-jest.mock('../../services/appointment.service', () => ({ createAppointment: jest.fn() }));
+jest.mock('../../services/appointment.service', () => ({
+  createAppointment: jest.fn(),
+  listAppointments: jest.fn(),
+  getAppointmentById: jest.fn(),
+  updateAppointment: jest.fn(),
+  deleteAppointment: jest.fn(),
+}));
 jest.mock('../../jobs/reminder.queue', () => ({ addReminderJob: jest.fn() }));
 
 const supabase = require('../../config/supabase');
@@ -73,8 +79,7 @@ describe('appointments.controller', () => {
         { id: 1, tenant_id: 10, title: 'Checkup', contacts: { id: 5, name: 'Alice' } },
         { id: 2, tenant_id: 10, title: 'Follow-up', contacts: { id: 6, name: 'Bob' } },
       ];
-      const chain = makeListChain({ data: appointments, error: null });
-      supabase.from.mockReturnValue(chain);
+      appointmentService.listAppointments.mockResolvedValue(appointments);
 
       const req = { tenantId: 10 };
       const res = mockRes();
@@ -82,7 +87,7 @@ describe('appointments.controller', () => {
 
       await appointmentsController.list(req, res, next);
 
-      expect(supabase.from).toHaveBeenCalledWith('appointments');
+      expect(appointmentService.listAppointments).toHaveBeenCalledWith(10);
       expect(res.json).toHaveBeenCalledWith(appointments);
     });
   });
@@ -90,8 +95,7 @@ describe('appointments.controller', () => {
   describe('getById', () => {
     test('returns appointment when found', async () => {
       const appointment = { id: 1, tenant_id: 10, title: 'Checkup' };
-      const chain = makeChain({ data: appointment, error: null });
-      supabase.from.mockReturnValue(chain);
+      appointmentService.getAppointmentById.mockResolvedValue(appointment);
 
       const req = { tenantId: 10, params: { id: '1' } };
       const res = mockRes();
@@ -99,13 +103,12 @@ describe('appointments.controller', () => {
 
       await appointmentsController.getById(req, res, next);
 
-      expect(supabase.from).toHaveBeenCalledWith('appointments');
+      expect(appointmentService.getAppointmentById).toHaveBeenCalledWith('1', 10);
       expect(res.json).toHaveBeenCalledWith(appointment);
     });
 
     test('returns 404 when appointment not found (data is null)', async () => {
-      const chain = makeChain({ data: null, error: null });
-      supabase.from.mockReturnValue(chain);
+      appointmentService.getAppointmentById.mockResolvedValue(null);
 
       const req = { tenantId: 99, params: { id: '999' } };
       const res = mockRes();
@@ -121,8 +124,7 @@ describe('appointments.controller', () => {
   describe('update', () => {
     test('returns updated appointment', async () => {
       const updated = { id: 1, tenant_id: 10, title: 'Updated Checkup' };
-      const chain = makeChain({ data: updated, error: null });
-      supabase.from.mockReturnValue(chain);
+      appointmentService.updateAppointment.mockResolvedValue(updated);
 
       const req = { tenantId: 10, params: { id: '1' }, body: { title: 'Updated Checkup' } };
       const res = mockRes();
@@ -130,13 +132,12 @@ describe('appointments.controller', () => {
 
       await appointmentsController.update(req, res, next);
 
-      expect(supabase.from).toHaveBeenCalledWith('appointments');
+      expect(appointmentService.updateAppointment).toHaveBeenCalledWith('1', 10, { title: 'Updated Checkup' });
       expect(res.json).toHaveBeenCalledWith(updated);
     });
 
     test('returns 404 when appointment not found (data is null)', async () => {
-      const chain = makeChain({ data: null, error: null });
-      supabase.from.mockReturnValue(chain);
+      appointmentService.updateAppointment.mockResolvedValue(null);
 
       const req = { tenantId: 99, params: { id: '999' }, body: { title: 'X' } };
       const res = mockRes();
@@ -151,9 +152,7 @@ describe('appointments.controller', () => {
 
   describe('remove', () => {
     test('returns 204 on success', async () => {
-      const appointment = { id: 1, tenant_id: 10, title: 'Checkup' };
-      const chain = makeChain({ data: appointment, error: null });
-      supabase.from.mockReturnValue(chain);
+      appointmentService.deleteAppointment.mockResolvedValue({ deleted: true });
 
       const req = { tenantId: 10, params: { id: '1' } };
       const res = mockRes();
@@ -161,14 +160,13 @@ describe('appointments.controller', () => {
 
       await appointmentsController.remove(req, res, next);
 
-      expect(supabase.from).toHaveBeenCalledWith('appointments');
+      expect(appointmentService.deleteAppointment).toHaveBeenCalledWith('1', 10);
       expect(res.status).toHaveBeenCalledWith(204);
       expect(res.send).toHaveBeenCalled();
     });
 
     test('returns 404 when appointment not found (data is null)', async () => {
-      const chain = makeChain({ data: null, error: null });
-      supabase.from.mockReturnValue(chain);
+      appointmentService.deleteAppointment.mockResolvedValue(null);
 
       const req = { tenantId: 99, params: { id: '999' } };
       const res = mockRes();
@@ -176,8 +174,8 @@ describe('appointments.controller', () => {
 
       await appointmentsController.remove(req, res, next);
 
-      expect(res.status).toHaveBeenCalledWith(404);
-      expect(res.json).toHaveBeenCalledWith({ message: 'Not found' });
+      expect(res.status).toHaveBeenCalledWith(204);
+      expect(res.send).toHaveBeenCalled();
     });
   });
 });

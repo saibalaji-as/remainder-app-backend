@@ -44,7 +44,7 @@ describe('Redis configuration', () => {
     expect(connectCall).toBeDefined();
 
     connectCall[1]();
-    expect(consoleSpy).toHaveBeenCalledWith('Redis connected (Upstash)');
+    expect(consoleSpy).toHaveBeenCalledWith('✅ Redis connected (Upstash)');
   });
 
   it('registers an "error" event handler that logs the error message', () => {
@@ -54,6 +54,6 @@ describe('Redis configuration', () => {
     expect(errorCall).toBeDefined();
 
     errorCall[1](new Error('connection refused'));
-    expect(consoleSpy).toHaveBeenCalledWith('connection refused');
+    expect(consoleSpy).toHaveBeenCalledWith('❌ Redis error:', 'connection refused');
   });
 });
