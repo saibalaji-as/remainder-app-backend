@@ -52,6 +52,9 @@ function makeAppointment(overrides = {}) {
     id: 'appt-1',
     status: 'scheduled',
     scheduled_at: new Date().toISOString(),
+    title: 'Checkup',
+    notes: 'Bring your insurance card',
+    tenant_id: 'tenant-1',
     contacts: {
       id: 'contact-1',
       name: 'Alice',
@@ -162,6 +165,10 @@ describe('Feature: b2b-reminder-job-queue, Property 2: Channel Routing Dispatche
               to: appointment.contacts.email,
               contactName: appointment.contacts.name,
               scheduledAt: appointment.scheduled_at,
+              notes: appointment.notes,
+              tenantId: appointment.tenant_id,
+              reminderId: job.data.reminderId,
+              appointmentTitle: appointment.title,
             });
             expect(mockSendReminderSms).not.toHaveBeenCalled();
           }

@@ -16,6 +16,7 @@ router.post(
     body('title').notEmpty(),
     body('scheduledAt').isISO8601(),
     body('reminderChannel').isIn(['sms', 'email', 'both']),
+    body('notes').optional().isString().isLength({ max: 500 }),
   ],
   validateMiddleware,
   appointmentsController.create
@@ -23,7 +24,12 @@ router.post(
 
 router.get('/', appointmentsController.list);
 router.get('/:id', appointmentsController.getById);
-router.put('/:id', appointmentsController.update);
+router.put(
+  '/:id',
+  [body('notes').optional().isString().isLength({ max: 500 })],
+  validateMiddleware,
+  appointmentsController.update
+);
 router.delete('/:id', appointmentsController.remove);
 
 module.exports = router;

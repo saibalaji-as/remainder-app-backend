@@ -41,12 +41,16 @@ const updateStatus = async (reminderId, status) => {
   return data;
 };
 
-async function scheduleReminders(appointmentId, scheduledAt) {
+async function scheduleReminders(appointmentId, scheduledAt, reminderChannel = 'sms') {
+  // Build reminder schedule based on the appointment's chosen channel
+  const useEmail = reminderChannel === 'email' || reminderChannel === 'both';
+  const useSms   = reminderChannel === 'sms'   || reminderChannel === 'both';
+
   const reminders = [
-    { offsetMs: 24 * 60 * 60 * 1000, channel: 'sms' },   // 24h before
-    { offsetMs: 2 * 60 * 60 * 1000, channel: 'sms' },    // 2h before
-    { offsetMs: 30 * 60 * 1000, channel: 'email' },      // 30min before
-    { offsetMs: 2 * 60 * 1000, channel: 'sms' },         // TEST: 2min before — remove in production
+    ...(useSms   ? [{ offsetMs: 24 * 60 * 60 * 1000, channel: 'sms'   }] : []),  // 24h before
+    ...(useSms   ? [{ offsetMs:  2 * 60 * 60 * 1000, channel: 'sms'   }] : []),  // 2h before
+    ...(useEmail ? [{ offsetMs:      30 * 60 * 1000, channel: 'email' }] : []),  // 30min before
+    ...(useSms   ? [{ offsetMs:       2 * 60 * 1000, channel: 'sms'   }] : []),  // TEST: 2min — remove in production
   ];
 
   for (const { offsetMs, channel } of reminders) {
@@ -84,4 +88,41 @@ const markReminderSent = async (id) => {
   return updateStatus(id, 'sent');
 };
 
-module.exports = { list, getById, fetchPending, updateStatus, scheduleReminders, getPendingReminders, markReminderSent };
+const retryReminder = async (tenantId, reminderId) => {
+  const reminder = await getById(tenantId, reminderId);
+
+  if (!reminder) return null;
+
+  if (reminder.status !== 'failed') {
+    throw { status: 400, message: 'Reminder is not in failed state' };
+  }
+
+  // Update status to pending
+  const { data: updatedData, error: updateError } = await supabase
+    .from('reminders')
+    .update({ status: 'pending' })
+    .eq('id', reminder.id)
+    .select()
+    .single();
+
+  if (updateError) throw updateError;
+
+  // Enqueue a new BullMQ job; roll back on failure
+  try {
+    await reminderQueue.add(
+      { reminderId: reminder.id, appointmentId: reminder.appointment_id, channel: reminder.channel },
+      { delay: 0, attempts: 3, backoff: { type: 'exponential', delay: 5000 }, removeOnComplete: true, removeOnFail: false }
+    );
+  } catch (enqueueError) {
+    // Roll back status to failed
+    await supabase
+      .from('reminders')
+      .update({ status: 'failed' })
+      .eq('id', reminder.id);
+    throw enqueueError;
+  }
+
+  return updatedData;
+};
+
+module.exports = { list, getById, fetchPending, updateStatus, scheduleReminders, getPendingReminders, markReminderSent, retryReminder };

@@ -28,6 +28,7 @@ describe('Feature: b2b-reminder-job-queue, Property 10: Appointment Creation Suc
   const appointmentArb = fc.record({
     id: fc.uuid(),
     scheduled_at: fc.date().map(d => d.toISOString()),
+    reminder_channel: fc.oneof(fc.constant('sms'), fc.constant('email'), fc.constant('both')),
   });
 
   const inputArb = fc.record({
@@ -78,7 +79,7 @@ describe('Feature: b2b-reminder-job-queue, Property 10: Appointment Creation Suc
 
         await createAppointment(input);
 
-        expect(scheduleReminders).toHaveBeenCalledWith(appointment.id, appointment.scheduled_at);
+        expect(scheduleReminders).toHaveBeenCalledWith(appointment.id, appointment.scheduled_at, appointment.reminder_channel);
       }),
       { numRuns: 100 }
     );

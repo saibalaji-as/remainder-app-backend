@@ -1,35 +1,77 @@
 const nodemailer = require('nodemailer');
+const templateService = require('../services/template.service');
+const sseManager = require('../sse.manager');
 
-const transporter = nodemailer.createTransport({
-  service: 'gmail',
-  auth: {
-    user: process.env.EMAIL_USER,
-    pass: process.env.EMAIL_APP_PASSWORD,
-  },
-});
+/**
+ * Creates a fresh Nodemailer transporter using current env vars.
+ * Called per-send so credentials are always read from the live process env.
+ */
+function createTransporter() {
+  return nodemailer.createTransport({
+    service: 'gmail',
+    auth: {
+      user: process.env.EMAIL_USER,
+      pass: process.env.EMAIL_APP_PASSWORD,
+    },
+  });
+}
 
-async function sendReminderEmail({ to, contactName, scheduledAt, notes }) {
-  const date = new Date(scheduledAt).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' });
-  const subject = `Appointment Reminder — ${date}`;
+/**
+ * Sends a reminder email to the given address.
+ *
+ * @param {object} params
+ * @param {string} params.to                - Recipient email address
+ * @param {string} params.contactName       - Contact's display name
+ * @param {string} params.scheduledAt       - ISO date string of the appointment
+ * @param {string} [params.notes]           - Optional appointment notes
+ * @param {string} [params.tenantId]        - Tenant identifier (for template lookup and SSE)
+ * @param {number|string} [params.reminderId]      - Reminder ID (for SSE payload)
+ * @param {string} [params.appointmentTitle]       - Appointment title (for SSE payload)
+ */
+async function sendReminderEmail({ to, contactName, scheduledAt, notes, tenantId, reminderId, appointmentTitle }) {
+  // Resolve template fields — prefer tenant-specific, fall back to defaults
+  let fields;
+  try {
+    const tenantFields = tenantId ? await templateService.getByTenant(tenantId) : null;
+    fields = tenantFields ?? templateService.getDefaults();
+  } catch (_err) {
+    fields = templateService.getDefaults();
+  }
 
-  const notesSection = notes
-    ? `<p><strong>Notes:</strong> ${notes}</p>`
-    : '';
+  // Build render context
+  const context = {
+    contactName,
+    appointmentDate: new Date(scheduledAt).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' }),
+    notes: notes || '',
+  };
 
-  const html = `
-    <p>Hi ${contactName},</p>
-    <p>This is a reminder for your upcoming appointment scheduled on <strong>${date}</strong>.</p>
-    ${notesSection}
-    <p>If you need to reschedule or have any questions, please reply to this email.</p>
-  `;
+  // Render template fields with context values
+  const rendered = templateService.renderTemplate(fields, context);
+
+  // Build HTML body — replace newlines in body with <br> for HTML rendering
+  const htmlBody = rendered.body.replace(/\n/g, '<br>');
+  const html = `<p>${rendered.greeting}</p>\n<p>${htmlBody}</p>\n<p>${rendered.closing}</p>`;
 
   try {
-    return await transporter.sendMail({
+    if (!process.env.EMAIL_USER || !process.env.EMAIL_APP_PASSWORD) {
+      throw new Error('Email credentials not configured. Set EMAIL_USER and EMAIL_APP_PASSWORD in .env');
+    }
+
+    const transporter = createTransporter();
+
+    const result = await transporter.sendMail({
       from: process.env.EMAIL_USER,
       to,
-      subject,
+      subject: rendered.subject,
       html,
     });
+
+    // Emit SSE event to tenant clients after successful send
+    if (tenantId !== undefined && tenantId !== null) {
+      sseManager.emit(tenantId, 'email-sent', { reminderId, contactName, appointmentTitle });
+    }
+
+    return result;
   } catch (err) {
     throw err;
   }

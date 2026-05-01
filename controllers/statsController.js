@@ -377,16 +377,37 @@ async function fetchUpcomingAppointments(tenantId) {
  * @returns {Promise<object[]>} reminder rows with id, status, sent_at, appointment_id
  */
 async function fetchRecentReminders(tenantId) {
+  // First get the appointment IDs for this tenant
+  const { data: apptData, error: apptError } = await supabase
+    .from('appointments')
+    .select('id, title')
+    .eq('tenant_id', tenantId);
+
+  if (apptError) throw apptError;
+
+  if (!apptData || apptData.length === 0) return [];
+
+  const apptIds = apptData.map(a => a.id);
+  const apptTitleMap = Object.fromEntries(apptData.map(a => [a.id, a.title]));
+
   const { data, error } = await supabase
     .from('reminders')
-    .select('id, status, sent_at, appointment_id, appointments!inner(tenant_id)')
-    .eq('appointments.tenant_id', tenantId)
-    .order('sent_at', { ascending: false })
+    .select('id, status, sent_at, scheduled_at, appointment_id, channel')
+    .in('appointment_id', apptIds)
+    .order('scheduled_at', { ascending: false })
     .limit(10);
 
   if (error) throw error;
 
-  return data || [];
+  return (data || []).map(r => ({
+    id: r.id,
+    status: r.status,
+    sent_at: r.sent_at,
+    scheduled_at: r.scheduled_at,
+    appointment_id: r.appointment_id,
+    channel: r.channel,
+    appointment_title: apptTitleMap[r.appointment_id] ?? `Appointment #${r.appointment_id}`,
+  }));
 }
 
 // ---------------------------------------------------------------------------

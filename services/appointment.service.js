@@ -13,7 +13,7 @@ const listAppointments = async (tenantId) => {
 const getAppointmentById = async (id, tenantId) => {
   const { data, error } = await supabase
     .from('appointments')
-    .select('*')
+    .select('*, contacts(*)')
     .eq('id', id)
     .eq('tenant_id', tenantId)
     .single();
@@ -21,17 +21,17 @@ const getAppointmentById = async (id, tenantId) => {
   return data;
 };
 
-const createAppointment = async ({ tenantId, contactId, title, scheduledAt, reminderChannel }) => {
+const createAppointment = async ({ tenantId, contactId, title, scheduledAt, reminderChannel, notes }) => {
   const { data, error } = await supabase
     .from('appointments')
-    .insert({ tenant_id: tenantId, contact_id: contactId, title, scheduled_at: scheduledAt, reminder_channel: reminderChannel })
+    .insert({ tenant_id: tenantId, contact_id: contactId, title, scheduled_at: scheduledAt, reminder_channel: reminderChannel, notes: notes || null })
     .select()
     .single();
   if (error) throw error;
 
   // Fire-and-forget: schedule reminders without blocking the response
-  console.log('[scheduleReminders] Triggering for appointment:', data.id, 'at:', data.scheduled_at);
-  scheduleReminders(data.id, data.scheduled_at)
+  console.log('[scheduleReminders] Triggering for appointment:', data.id, 'at:', data.scheduled_at, 'channel:', data.reminder_channel);
+  scheduleReminders(data.id, data.scheduled_at, data.reminder_channel)
     .catch(err => console.error('[scheduleReminders] Error:', err.message, err.stack));
 
   return data;

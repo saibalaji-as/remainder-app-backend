@@ -3,6 +3,7 @@
 const fc = require('fast-check');
 
 process.env.EMAIL_USER = 'test@gmail.com';
+process.env.EMAIL_APP_PASSWORD = 'test-app-password';
 
 const mockSendMail = jest.fn();
 const mockTransporter = { sendMail: mockSendMail };
@@ -11,12 +12,53 @@ jest.mock('nodemailer', () => ({
   createTransport: jest.fn(() => mockTransporter),
 }));
 
+// Mock templateService to avoid Supabase env var requirement at module load
+const mockGetByTenant = jest.fn();
+const mockGetDefaults = jest.fn();
+const mockRenderTemplate = jest.fn();
+jest.mock('../../services/template.service', () => ({
+  getByTenant: (...args) => mockGetByTenant(...args),
+  getDefaults: (...args) => mockGetDefaults(...args),
+  renderTemplate: (...args) => mockRenderTemplate(...args),
+}));
+
+// Mock sseManager — pure in-memory module, but mock to isolate side effects
+const mockSseEmit = jest.fn();
+jest.mock('../../sse.manager', () => ({
+  emit: (...args) => mockSseEmit(...args),
+  addClient: jest.fn(),
+  removeClient: jest.fn(),
+}));
+
 const emailService = require('../../services/email.service');
 
 describe('email.service - Property 9: Email service parameter forwarding', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockSendMail.mockResolvedValue({ messageId: 'test-id' });
+
+    // Default template service behaviour: no tenant template, use defaults
+    mockGetByTenant.mockResolvedValue(null);
+    mockGetDefaults.mockReturnValue({
+      subject:  'Appointment Reminder — {{appointmentDate}}',
+      greeting: 'Hi {{contactName}},',
+      body:     'This is a reminder for your upcoming appointment scheduled on {{appointmentDate}}.\n{{notes}}',
+      closing:  'If you need to reschedule, please reply to this email.',
+    });
+    // renderTemplate: perform real substitution inline so the test stays meaningful
+    mockRenderTemplate.mockImplementation((fields, context) => {
+      const replace = (text) =>
+        text
+          .replace(/\{\{contactName\}\}/g,     () => context.contactName     ?? '')
+          .replace(/\{\{appointmentDate\}\}/g, () => context.appointmentDate ?? '')
+          .replace(/\{\{notes\}\}/g,           () => context.notes           ?? '');
+      return {
+        subject:  replace(fields.subject  ?? ''),
+        greeting: replace(fields.greeting ?? ''),
+        body:     replace(fields.body     ?? ''),
+        closing:  replace(fields.closing  ?? ''),
+      };
+    });
   });
 
   /**

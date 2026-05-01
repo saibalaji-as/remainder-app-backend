@@ -30,8 +30,17 @@ reminderQueue.process(async (job) => {
       to: appointment.contacts.email,
       contactName: appointment.contacts.name,
       scheduledAt: appointment.scheduled_at,
+      notes: appointment.notes,
+      tenantId: appointment.tenant_id,
+      reminderId,
+      appointmentTitle: appointment.title,
     });
   }
+
+  await supabase
+    .from('reminders')
+    .update({ status: 'sent', sent_at: new Date().toISOString() })
+    .eq('id', reminderId);
 
   console.log('✅ Reminder job ' + job.id + ' completed');
 });

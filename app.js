@@ -9,6 +9,7 @@ const appointmentsRoutes = require('./routes/appointments.routes');
 const remindersRoutes = require('./routes/reminders.routes');
 const billingRoutes = require('./routes/billing.routes');
 const statsRoutes = require('./routes/stats');
+const templatesRoutes = require('./routes/templates.routes');
 
 const app = express();
 
@@ -48,6 +49,13 @@ app.use('/api/appointments', appointmentsRoutes);
 app.use('/api/reminders', remindersRoutes);
 app.use('/api/billing', billingRoutes);
 app.use('/api/dashboard', statsRoutes);
+app.use('/api/email-templates', templatesRoutes);
+
+// SSE endpoint — must be registered after CORS/auth middleware
+const authMiddleware = require('./middleware/auth.middleware');
+const tenantMiddleware = require('./middleware/tenant.middleware');
+const remindersController = require('./controllers/reminders.controller');
+app.get('/api/sse/reminders', authMiddleware, tenantMiddleware, remindersController.stream);
 
 if (process.env.NODE_ENV !== 'production') {
   const testRoutes = require('./routes/test.routes');

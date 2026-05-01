@@ -144,10 +144,10 @@ describe('reminder.service - Property 5: Exactly Three Reminders With Correct Ti
               return { insert };
             });
 
-            await reminderService.scheduleReminders(appointmentId, scheduledAt);
+            await reminderService.scheduleReminders(appointmentId, scheduledAt, 'both');
 
-            // Exactly 3 jobs enqueued
-            expect(mockQueueAdd).toHaveBeenCalledTimes(3);
+            // Exactly 4 jobs enqueued (3 production + 1 test entry at 2min)
+            expect(mockQueueAdd).toHaveBeenCalledTimes(4);
 
             const calls = mockQueueAdd.mock.calls;
             const scheduledMs = scheduledAt.getTime();
@@ -202,7 +202,7 @@ describe('reminder.service - Property 6: Past Reminder Windows Are Skipped', () 
           async (appointmentId, scheduledAt) => {
             jest.clearAllMocks();
 
-            await reminderService.scheduleReminders(appointmentId, scheduledAt);
+            await reminderService.scheduleReminders(appointmentId, scheduledAt, 'both');
 
             // No rows inserted, no jobs enqueued
             expect(mockFrom).not.toHaveBeenCalled();
@@ -256,9 +256,9 @@ describe('reminder.service - Property 7: Inserted Reminder Rows Have Correct Fie
               return { insert };
             });
 
-            await reminderService.scheduleReminders(appointmentId, scheduledAt);
+            await reminderService.scheduleReminders(appointmentId, scheduledAt, 'both');
 
-            expect(insertedRows).toHaveLength(3);
+            expect(insertedRows).toHaveLength(4);
 
             for (const row of insertedRows) {
               expect(row.appointment_id).toBe(appointmentId);
@@ -310,7 +310,7 @@ describe('reminder.service - Property 8: Supabase Errors Propagate From Schedule
             });
 
             await expect(
-              reminderService.scheduleReminders(appointmentId, scheduledAt)
+              reminderService.scheduleReminders(appointmentId, scheduledAt, 'both')
             ).rejects.toBe(supabaseError);
           }
         ),
@@ -351,6 +351,7 @@ describe('reminder.service - Property 9: Bull Job Options Are Always Correctly C
               24 * 60 * 60 * 1000,
               2 * 60 * 60 * 1000,
               30 * 60 * 1000,
+              2 * 60 * 1000,  // TEST: 2min before
             ];
 
             let callCount = 0;
@@ -363,9 +364,9 @@ describe('reminder.service - Property 9: Bull Job Options Are Always Correctly C
               return { insert };
             });
 
-            await reminderService.scheduleReminders(appointmentId, scheduledAt);
+            await reminderService.scheduleReminders(appointmentId, scheduledAt, 'both');
 
-            expect(mockQueueAdd).toHaveBeenCalledTimes(3);
+            expect(mockQueueAdd).toHaveBeenCalledTimes(4);
 
             const scheduledMs = scheduledAt.getTime();
 

@@ -8,6 +8,7 @@ async function create(req, res, next) {
       title: req.body.title,
       scheduledAt: req.body.scheduledAt,
       reminderChannel: req.body.reminderChannel,
+      notes: req.body.notes,
     });
     return res.status(201).json(appointment);
   } catch (err) {
