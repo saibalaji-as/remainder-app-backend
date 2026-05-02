@@ -20,6 +20,12 @@ jest.mock('bull', () => {
 
 jest.mock('../../config/redis', () => ({}));
 
+// Mock jsonwebtoken — sign returns a deterministic fake token
+const FAKE_TOKEN = 'fake.jwt.token';
+jest.mock('jsonwebtoken', () => ({
+  sign: jest.fn().mockReturnValue(FAKE_TOKEN),
+}));
+
 // Supabase mock with controllable responses
 let mockFetchResult = { data: null, error: null };
 let mockUpdateResult = { error: null };
@@ -40,9 +46,11 @@ jest.mock('../../config/supabase', () => ({ from: mockFrom }));
 
 const mockSendReminderSms = jest.fn().mockResolvedValue({});
 const mockSendReminderEmail = jest.fn().mockResolvedValue({});
+const mockSendReminderWhatsApp = jest.fn().mockResolvedValue({});
 
 jest.mock('../../services/sms.service', () => ({ sendReminderSms: mockSendReminderSms }));
 jest.mock('../../services/email.service', () => ({ sendReminderEmail: mockSendReminderEmail }));
+jest.mock('../../services/whatsapp.service', () => ({ sendReminderWhatsApp: mockSendReminderWhatsApp }));
 
 // Load processor to register handlers
 require('../../jobs/reminder.processor');
@@ -68,6 +76,8 @@ function makeAppointment(overrides = {}) {
 function makeJob(overrides = {}) {
   return {
     id: 'job-1',
+    attemptsMade: 0,
+    opts: { attempts: 3 },
     data: {
       reminderId: 'reminder-1',
       appointmentId: 'appt-1',
@@ -155,9 +165,15 @@ describe('Feature: b2b-reminder-job-queue, Property 2: Channel Routing Dispatche
           const job = makeJob({ channel });
           await registeredProcessor(job);
 
+          const expectedConfirmationLink = `${process.env.FRONTEND_URL}/confirm?token=${FAKE_TOKEN}`;
+
           if (channel === 'sms') {
             expect(mockSendReminderSms).toHaveBeenCalledTimes(1);
-            expect(mockSendReminderSms).toHaveBeenCalledWith(job.data.reminderId, appointment);
+            expect(mockSendReminderSms).toHaveBeenCalledWith(
+              job.data.reminderId,
+              appointment,
+              expectedConfirmationLink
+            );
             expect(mockSendReminderEmail).not.toHaveBeenCalled();
           } else if (channel === 'email') {
             expect(mockSendReminderEmail).toHaveBeenCalledTimes(1);
@@ -169,6 +185,7 @@ describe('Feature: b2b-reminder-job-queue, Property 2: Channel Routing Dispatche
               tenantId: appointment.tenant_id,
               reminderId: job.data.reminderId,
               appointmentTitle: appointment.title,
+              confirmationLink: expectedConfirmationLink,
             });
             expect(mockSendReminderSms).not.toHaveBeenCalled();
           }

@@ -82,3 +82,28 @@ describe('sms.service - Property 15: buildMessage formats date in IST timezone',
     30000
   );
 });
+
+// Property 6: Confirmation link is present in every SMS when channel includes SMS
+// Validates: Requirements 1.5
+describe('sms.service - Property 6: Confirmation link is present in every SMS', () => {
+  test(
+    'buildMessage always contains the confirmationLink when one is provided',
+    () => {
+      fc.assert(
+        fc.property(
+          fc.string({ minLength: 1 }),
+          fc.date(),
+          fc.option(fc.string({ minLength: 1 })),
+          fc.webUrl(),
+          (contactName, date, notes, confirmationLink) => {
+            const scheduledAt = date.toISOString();
+            const result = smsService.buildMessage(contactName, scheduledAt, notes, confirmationLink);
+            expect(result).toContain(confirmationLink);
+          }
+        ),
+        { numRuns: 100 }
+      );
+    },
+    30000
+  );
+});

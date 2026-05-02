@@ -323,6 +323,42 @@ describe('getDashboardStats — integration-style tests', () => {
     }
 
     // pieData should be zero
-    expect(payload.pieData).toEqual({ sms: 0, email: 0 });
+    expect(payload.pieData).toEqual({ sms: 0, email: 0, whatsapp: 0 });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Property 8: buildPieData counts each channel independently and correctly
+// Validates: Requirements 6.4
+// ---------------------------------------------------------------------------
+
+const fc = require('fast-check');
+
+describe('Property 8: buildPieData counts each channel independently and correctly', () => {
+  test('for any array of rows with arbitrary channel values, counts match exactly with no cross-contamination', () => {
+    const { buildPieData } = statsController.__testExports;
+
+    fc.assert(
+      fc.property(
+        fc.array(
+          fc.record({ channel: fc.constantFrom('sms', 'email', 'whatsapp', 'other') })
+        ),
+        (rows) => {
+          const result = buildPieData(rows);
+
+          const expectedSms      = rows.filter(r => r.channel === 'sms').length;
+          const expectedEmail    = rows.filter(r => r.channel === 'email').length;
+          const expectedWhatsApp = rows.filter(r => r.channel === 'whatsapp').length;
+
+          expect(result.sms).toBe(expectedSms);
+          expect(result.email).toBe(expectedEmail);
+          expect(result.whatsapp).toBe(expectedWhatsApp);
+
+          // No cross-contamination: total counted must not exceed total rows
+          expect(result.sms + result.email + result.whatsapp).toBeLessThanOrEqual(rows.length);
+        }
+      ),
+      { numRuns: 100 }
+    );
   });
 });

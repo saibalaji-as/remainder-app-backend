@@ -1,6 +1,7 @@
 const nodemailer = require('nodemailer');
 const templateService = require('../services/template.service');
 const sseManager = require('../sse.manager');
+const supabase = require('../config/supabase');
 
 /**
  * Creates a fresh Nodemailer transporter using current env vars.
@@ -27,8 +28,9 @@ function createTransporter() {
  * @param {string} [params.tenantId]        - Tenant identifier (for template lookup and SSE)
  * @param {number|string} [params.reminderId]      - Reminder ID (for SSE payload)
  * @param {string} [params.appointmentTitle]       - Appointment title (for SSE payload)
+ * @param {string} [params.confirmationLink]       - Confirmation link URL for Yes/No buttons
  */
-async function sendReminderEmail({ to, contactName, scheduledAt, notes, tenantId, reminderId, appointmentTitle }) {
+async function sendReminderEmail({ to, contactName, scheduledAt, notes, tenantId, reminderId, appointmentTitle, confirmationLink }) {
   // Resolve template fields — prefer tenant-specific, fall back to defaults
   let fields;
   try {
@@ -50,7 +52,17 @@ async function sendReminderEmail({ to, contactName, scheduledAt, notes, tenantId
 
   // Build HTML body — replace newlines in body with <br> for HTML rendering
   const htmlBody = rendered.body.replace(/\n/g, '<br>');
-  const html = `<p>${rendered.greeting}</p>\n<p>${htmlBody}</p>\n<p>${rendered.closing}</p>`;
+
+  // Build optional Yes/No confirmation buttons section (only when confirmationLink is provided)
+  const confirmationButtons = confirmationLink
+    ? `<div style="margin: 1.5rem 0; text-align: center;">
+    <a href="${confirmationLink}&response=yes" style="display:inline-block;padding:0.75rem 1.5rem;background:#16a34a;color:#fff;text-decoration:none;border-radius:6px;font-weight:600;">✓ Yes, I'll be there</a>
+    &nbsp;&nbsp;
+    <a href="${confirmationLink}&response=no" style="display:inline-block;padding:0.75rem 1.5rem;background:#dc2626;color:#fff;text-decoration:none;border-radius:6px;font-weight:600;">✗ No, I need to cancel</a>
+  </div>`
+    : '';
+
+  const html = `<p>${rendered.greeting}</p>\n<p>${htmlBody}</p>\n${confirmationButtons}<p>${rendered.closing}</p>`;
 
   try {
     if (!process.env.EMAIL_USER || !process.env.EMAIL_APP_PASSWORD) {
@@ -71,8 +83,23 @@ async function sendReminderEmail({ to, contactName, scheduledAt, notes, tenantId
       sseManager.emit(tenantId, 'email-sent', { reminderId, contactName, appointmentTitle });
     }
 
+    // Mark reminder as sent
+    if (reminderId) {
+      await supabase
+        .from('reminders')
+        .update({ status: 'sent', sent_at: new Date().toISOString() })
+        .eq('id', reminderId);
+    }
+
     return result;
   } catch (err) {
+    // Mark reminder as failed
+    if (reminderId) {
+      await supabase
+        .from('reminders')
+        .update({ status: 'failed' })
+        .eq('id', reminderId);
+    }
     throw err;
   }
 }

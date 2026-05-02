@@ -9,16 +9,17 @@ async function sendSms({ to, message }) {
   });
 }
 
-function buildMessage(contactName, scheduledAt, notes) {
+function buildMessage(contactName, scheduledAt, notes, confirmationLink) {
   const date = new Date(scheduledAt).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' });
-  const notesPart = notes ? `${notes} ` : '';
-  return `Hi ${contactName}, this is a reminder for your appointment on ${date}. ${notesPart}Reply YES to confirm or NO to cancel.`;
+  const notesPart = notes ? ` ${notes}` : '';
+  const base = `Hi ${contactName}, reminder: appointment on ${date}.${notesPart} Reply YES/NO.`;
+  return confirmationLink ? `${base} Confirm: ${confirmationLink}` : base;
 }
 
-async function sendReminderSms(reminderId, appointment) {
+async function sendReminderSms(reminderId, appointment, confirmationLink) {
   const contact = appointment.contacts || appointment.contact;
   const { scheduled_at } = appointment;
-  const message = buildMessage(contact.name, scheduled_at, appointment.notes);
+  const message = buildMessage(contact.name, scheduled_at, appointment.notes, confirmationLink);
 
   // Normalize to E.164 — prepend +91 if no country code present
   const phone = contact.phone.startsWith('+') ? contact.phone : `+91${contact.phone}`;

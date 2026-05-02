@@ -15,7 +15,7 @@ router.post(
     body('contactId').isUUID(),
     body('title').notEmpty(),
     body('scheduledAt').isISO8601(),
-    body('reminderChannel').isIn(['sms', 'email', 'both']),
+    body('reminderChannel').isIn(['sms', 'email', 'both', 'whatsapp', 'whatsapp_sms', 'whatsapp_email', 'all']),
     body('notes').optional().isString().isLength({ max: 500 }),
   ],
   validateMiddleware,
@@ -31,5 +31,12 @@ router.put(
   appointmentsController.update
 );
 router.delete('/:id', appointmentsController.remove);
+
+router.patch(
+  '/:id/status',
+  [body('status').isIn(['confirmed', 'cancelled', 'completed'])],
+  validateMiddleware,
+  appointmentsController.updateStatus
+);
 
 module.exports = router;

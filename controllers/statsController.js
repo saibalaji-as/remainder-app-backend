@@ -501,19 +501,20 @@ function buildGraphData(graphResult, windowStart) {
 
 /**
  * Builds the pie chart data object from raw reminder rows.
- * Counts reminders by channel (sms or email).
+ * Counts reminders by channel (sms, email, or whatsapp).
  *
  * @param {object[]|null} rows - raw reminder rows with a `channel` field
- * @returns {{ sms: number, email: number }}
+ * @returns {{ sms: number, email: number, whatsapp: number }}
  */
 function buildPieData(rows) {
-  const pieData = { sms: 0, email: 0 };
+  const pieData = { sms: 0, email: 0, whatsapp: 0 };
 
   if (!rows) return pieData;
 
   for (const row of rows) {
-    if (row.channel === 'sms') pieData.sms++;
-    else if (row.channel === 'email') pieData.email++;
+    if (row.channel === 'sms')           pieData.sms++;
+    else if (row.channel === 'email')    pieData.email++;
+    else if (row.channel === 'whatsapp') pieData.whatsapp++;
   }
 
   return pieData;

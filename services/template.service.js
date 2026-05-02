@@ -26,6 +26,8 @@ const getByTenant = async (tenantId) => {
   if (error) {
     // PGRST116 = "no rows returned" — treat as not found
     if (error.code === 'PGRST116') return null;
+    // PGRST205 = table not in schema cache (table doesn't exist yet) — fall back to defaults
+    if (error.code === 'PGRST205') return null;
     throw error;
   }
 
@@ -46,7 +48,11 @@ const upsert = async (tenantId, fields) => {
     .select()
     .single();
 
-  if (error) throw error;
+  if (error) {
+    // PGRST205 = table doesn't exist yet — return the fields as-is so the UI doesn't break
+    if (error.code === 'PGRST205') return { tenant_id: tenantId, ...fields };
+    throw error;
+  }
   return data;
 };
 

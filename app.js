@@ -10,6 +10,7 @@ const remindersRoutes = require('./routes/reminders.routes');
 const billingRoutes = require('./routes/billing.routes');
 const statsRoutes = require('./routes/stats');
 const templatesRoutes = require('./routes/templates.routes');
+const confirmRoutes = require('./routes/confirm.routes');
 
 const app = express();
 
@@ -41,6 +42,9 @@ app.use(express.json());
 
 // handle preflight for all routes
 app.options('*', cors());
+
+// Public routes — no auth middleware (must be registered before auth-protected routes)
+app.use('/api/confirm', confirmRoutes);
 
 app.use('/api/auth', authRoutes);
 app.use('/api/tenants', tenantRoutes);

@@ -22,6 +22,10 @@ app.listen(PORT, () => {
   // Load processor to start consuming jobs
   require('./jobs/reminder.processor');
   console.log('⚙️ Reminder job processor started');
+
+  const { startNudgeJob } = require('./jobs/nudge.job');
+  startNudgeJob();
+  console.log('⏰ Nudge job started (5-minute interval)');
 });
 
 module.exports = app;

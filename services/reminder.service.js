@@ -43,21 +43,33 @@ const updateStatus = async (reminderId, status) => {
 
 async function scheduleReminders(appointmentId, scheduledAt, reminderChannel = 'sms') {
   // Build reminder schedule based on the appointment's chosen channel
-  const useEmail = reminderChannel === 'email' || reminderChannel === 'both';
-  const useSms   = reminderChannel === 'sms'   || reminderChannel === 'both';
+  const useEmail    = reminderChannel === 'email'          || reminderChannel === 'both'
+                   || reminderChannel === 'whatsapp_email' || reminderChannel === 'all';
+  const useSms      = reminderChannel === 'sms'            || reminderChannel === 'both'
+                   || reminderChannel === 'whatsapp_sms'   || reminderChannel === 'all';
+  const useWhatsApp = reminderChannel === 'whatsapp'
+                   || reminderChannel === 'whatsapp_sms'
+                   || reminderChannel === 'whatsapp_email' || reminderChannel === 'all';
 
   const reminders = [
-    ...(useSms   ? [{ offsetMs: 24 * 60 * 60 * 1000, channel: 'sms'   }] : []),  // 24h before
-    ...(useSms   ? [{ offsetMs:  2 * 60 * 60 * 1000, channel: 'sms'   }] : []),  // 2h before
-    ...(useEmail ? [{ offsetMs:      30 * 60 * 1000, channel: 'email' }] : []),  // 30min before
-    ...(useSms   ? [{ offsetMs:       2 * 60 * 1000, channel: 'sms'   }] : []),  // TEST: 2min — remove in production
+    ...(useSms       ? [{ offsetMs: 24 * 60 * 60 * 1000, channel: 'sms'      }] : []),  // 24h before
+    ...(useSms       ? [{ offsetMs:  2 * 60 * 60 * 1000, channel: 'sms'      }] : []),  // 2h before
+    ...(useWhatsApp  ? [{ offsetMs: 24 * 60 * 60 * 1000, channel: 'whatsapp' }] : []),  // 24h before
+    ...(useWhatsApp  ? [{ offsetMs:  2 * 60 * 60 * 1000, channel: 'whatsapp' }] : []),  // 2h before
+    ...(useEmail     ? [{ offsetMs:      30 * 60 * 1000, channel: 'email'    }] : []),  // 30min before
+    ...(useSms       ? [{ offsetMs:       2 * 60 * 1000, channel: 'sms'      }] : []),  // TEST: 2min
+    ...(useWhatsApp  ? [{ offsetMs:       2 * 60 * 1000, channel: 'whatsapp' }] : []),  // TEST: 2min
+    ...(useEmail     ? [{ offsetMs:       2 * 60 * 1000, channel: 'email'    }] : []),  // TEST: 2min
   ];
 
   for (const { offsetMs, channel } of reminders) {
     const reminderTime = new Date(scheduledAt).getTime() - offsetMs;
     const delay = reminderTime - Date.now();
 
-    if (delay <= 0) continue; // skip past windows
+    if (delay <= 0) {
+      console.log(`⏭ Skipping ${channel} reminder (window already passed) for appointment ${appointmentId}`);
+      continue; // skip past windows
+    }
 
     const { data, error } = await supabase
       .from('reminders')
@@ -125,4 +137,14 @@ const retryReminder = async (tenantId, reminderId) => {
   return updatedData;
 };
 
-module.exports = { list, getById, fetchPending, updateStatus, scheduleReminders, getPendingReminders, markReminderSent, retryReminder };
+const skipPendingReminders = async (appointmentId) => {
+  const { data, error } = await supabase
+    .from('reminders')
+    .update({ status: 'skipped' })
+    .eq('appointment_id', appointmentId)
+    .eq('status', 'pending');
+  if (error) throw error;
+  return data;
+};
+
+module.exports = { list, getById, fetchPending, updateStatus, scheduleReminders, getPendingReminders, markReminderSent, retryReminder, skipPendingReminders };

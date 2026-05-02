@@ -146,8 +146,8 @@ describe('reminder.service - Property 5: Exactly Three Reminders With Correct Ti
 
             await reminderService.scheduleReminders(appointmentId, scheduledAt, 'both');
 
-            // Exactly 4 jobs enqueued (3 production + 1 test entry at 2min)
-            expect(mockQueueAdd).toHaveBeenCalledTimes(4);
+            // 'both' = sms+email: sms 24h, sms 2h, email 30min, sms 2min TEST, email 2min TEST = 5 jobs
+            expect(mockQueueAdd).toHaveBeenCalledTimes(5);
 
             const calls = mockQueueAdd.mock.calls;
             const scheduledMs = scheduledAt.getTime();
@@ -258,7 +258,7 @@ describe('reminder.service - Property 7: Inserted Reminder Rows Have Correct Fie
 
             await reminderService.scheduleReminders(appointmentId, scheduledAt, 'both');
 
-            expect(insertedRows).toHaveLength(4);
+            expect(insertedRows).toHaveLength(5);
 
             for (const row of insertedRows) {
               expect(row.appointment_id).toBe(appointmentId);
@@ -348,10 +348,11 @@ describe('reminder.service - Property 9: Bull Job Options Are Always Correctly C
             mockQueueAdd.mockResolvedValue({});
 
             const offsets = [
-              24 * 60 * 60 * 1000,
-              2 * 60 * 60 * 1000,
-              30 * 60 * 1000,
-              2 * 60 * 1000,  // TEST: 2min before
+              24 * 60 * 60 * 1000,  // sms 24h
+              2 * 60 * 60 * 1000,   // sms 2h
+              30 * 60 * 1000,       // email 30min
+              2 * 60 * 1000,        // sms TEST 2min
+              2 * 60 * 1000,        // email TEST 2min
             ];
 
             let callCount = 0;
@@ -366,7 +367,7 @@ describe('reminder.service - Property 9: Bull Job Options Are Always Correctly C
 
             await reminderService.scheduleReminders(appointmentId, scheduledAt, 'both');
 
-            expect(mockQueueAdd).toHaveBeenCalledTimes(4);
+            expect(mockQueueAdd).toHaveBeenCalledTimes(5);
 
             const scheduledMs = scheduledAt.getTime();
 
@@ -383,6 +384,135 @@ describe('reminder.service - Property 9: Bull Job Options Are Always Correctly C
           }
         ),
         { numRuns: 50 }
+      );
+    },
+    60000
+  );
+});
+
+// **Validates: Requirements 3.5, 5.5**
+describe('reminder.service - Property 3: Cancellation skips all pending reminders', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  test(
+    'skipPendingReminders updates all pending reminders for the given appointmentId to skipped',
+    async () => {
+      await fc.assert(
+        fc.asyncProperty(
+          fc.uuid(),
+          async (appointmentId) => {
+            // Chain: from('reminders').update({ status: 'skipped' }).eq('appointment_id', appointmentId).eq('status', 'pending')
+            const secondEq = jest.fn().mockResolvedValue({ data: [], error: null });
+            const firstEq = jest.fn().mockReturnValue({ eq: secondEq });
+            const update = jest.fn().mockReturnValue({ eq: firstEq });
+            mockFrom.mockReturnValue({ update });
+
+            await reminderService.skipPendingReminders(appointmentId);
+
+            expect(mockFrom).toHaveBeenCalledWith('reminders');
+            expect(update).toHaveBeenCalledWith({ status: 'skipped' });
+            expect(firstEq).toHaveBeenCalledWith('appointment_id', appointmentId);
+            expect(secondEq).toHaveBeenCalledWith('status', 'pending');
+          }
+        ),
+        { numRuns: 50 }
+      );
+    },
+    30000
+  );
+
+  test(
+    'skipPendingReminders throws when Supabase returns an error',
+    async () => {
+      await fc.assert(
+        fc.asyncProperty(
+          fc.uuid(),
+          fc.record({ message: fc.string() }),
+          async (appointmentId, supabaseError) => {
+            const secondEq = jest.fn().mockResolvedValue({ data: null, error: supabaseError });
+            const firstEq = jest.fn().mockReturnValue({ eq: secondEq });
+            const update = jest.fn().mockReturnValue({ eq: firstEq });
+            mockFrom.mockReturnValue({ update });
+
+            await expect(
+              reminderService.skipPendingReminders(appointmentId)
+            ).rejects.toBe(supabaseError);
+          }
+        ),
+        { numRuns: 50 }
+      );
+    },
+    30000
+  );
+});
+
+// **Validates: Requirements 3.1, 3.2, 3.3, 3.4, 3.5**
+describe('reminder.service - Property 7: scheduleReminders enqueues correct channel set for every valid reminderChannel value', () => {
+  let dateNowSpy;
+  const fixedNow = Date.now();
+
+  // Channel matrix: maps each reminderChannel to the expected set of channels enqueued
+  const channelMatrix = {
+    sms:            ['sms'],
+    email:          ['email'],
+    both:           ['sms', 'email'],
+    whatsapp:       ['whatsapp'],
+    whatsapp_sms:   ['whatsapp', 'sms'],
+    whatsapp_email: ['whatsapp', 'email'],
+    all:            ['whatsapp', 'sms', 'email'],
+  };
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    dateNowSpy = jest.spyOn(Date, 'now').mockReturnValue(fixedNow);
+    mockQueueAdd.mockResolvedValue({});
+  });
+
+  afterEach(() => {
+    dateNowSpy.mockRestore();
+  });
+
+  test(
+    'Feature: whatsapp-reminder-channel, Property 7: scheduleReminders enqueues the correct channel set for every valid reminderChannel value',
+    async () => {
+      await fc.assert(
+        fc.asyncProperty(
+          fc.uuid(),
+          fc.date({ min: new Date(fixedNow + 25 * 3600 * 1000) }),
+          fc.constantFrom('sms', 'email', 'both', 'whatsapp', 'whatsapp_sms', 'whatsapp_email', 'all'),
+          async (appointmentId, scheduledAt, reminderChannel) => {
+            jest.clearAllMocks();
+            mockQueueAdd.mockResolvedValue({});
+
+            let callCount = 0;
+            mockFrom.mockImplementation(() => {
+              callCount++;
+              const id = `reminder-id-${callCount}`;
+              const single = jest.fn().mockResolvedValue({ data: { id }, error: null });
+              const select = jest.fn().mockReturnValue({ single });
+              const insert = jest.fn().mockReturnValue({ select });
+              return { insert };
+            });
+
+            await reminderService.scheduleReminders(appointmentId, scheduledAt, reminderChannel);
+
+            const enqueuedChannels = mockQueueAdd.mock.calls.map((call) => call[0].channel);
+            const expectedChannels = channelMatrix[reminderChannel];
+
+            // Every expected channel must appear at least once
+            for (const ch of expectedChannels) {
+              expect(enqueuedChannels).toContain(ch);
+            }
+
+            // No unexpected channels must appear
+            for (const ch of enqueuedChannels) {
+              expect(expectedChannels).toContain(ch);
+            }
+          }
+        ),
+        { numRuns: 100 }
       );
     },
     60000

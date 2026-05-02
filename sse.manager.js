@@ -65,4 +65,15 @@ function emit(tenantId, eventName, data) {
   }
 }
 
-module.exports = { addClient, removeClient, emit };
+/**
+ * Check whether at least one SSE client is connected for a tenant.
+ *
+ * @param {string} tenantId
+ * @returns {boolean}
+ */
+function hasClients(tenantId) {
+  const tenantClients = clients.get(tenantId);
+  return !!(tenantClients && tenantClients.size > 0);
+}
+
+module.exports = { addClient, removeClient, emit, hasClients };
