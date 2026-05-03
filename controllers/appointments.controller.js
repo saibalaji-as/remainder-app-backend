@@ -47,7 +47,14 @@ async function getById(req, res, next) {
 
 async function update(req, res, next) {
   try {
-    const data = await appointmentService.updateAppointment(req.params.id, req.tenantId, req.body);
+    const { title, scheduledAt, notes, reminderChannel } = req.body;
+    const payload = {
+      ...(title !== undefined           && { title }),
+      ...(notes !== undefined           && { notes }),
+      ...(scheduledAt !== undefined     && { scheduled_at: new Date(scheduledAt).toISOString() }),
+      ...(reminderChannel !== undefined && { reminder_channel: reminderChannel }),
+    };
+    const data = await appointmentService.updateAppointment(req.params.id, req.tenantId, payload);
     if (!data) return res.status(404).json({ message: 'Not found' });
     return res.json(data);
   } catch (err) {

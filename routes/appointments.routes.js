@@ -12,7 +12,7 @@ router.use(authMiddleware, tenantMiddleware);
 router.post(
   '/',
   [
-    body('contactId').isUUID(),
+    body('contactId').notEmpty(),
     body('title').notEmpty(),
     body('scheduledAt').isISO8601(),
     body('reminderChannel').isIn(['sms', 'email', 'both', 'whatsapp', 'whatsapp_sms', 'whatsapp_email', 'all']),

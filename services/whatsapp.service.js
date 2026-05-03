@@ -1,5 +1,6 @@
 const client = require('../config/twilio');
 const supabase = require('../config/supabase');
+const sseManager = require('../sse.manager');
 
 /**
  * Sends a WhatsApp message via Twilio.
@@ -36,8 +37,20 @@ function buildWhatsAppMessage(contactName, scheduledAt, notes, confirmationLink)
  * @param {string} reminderId
  * @param {object} appointment  - includes contacts sub-object
  * @param {string} confirmationLink
+ * @param {string} [tenantId]         - tenant ID for SSE emit
+ * @param {string} [contactName]      - contact name for SSE payload
+ * @param {string} [appointmentTitle] - appointment title for SSE payload
  */
-async function sendReminderWhatsApp(reminderId, appointment, confirmationLink) {
+async function sendReminderWhatsApp(reminderId, appointment, confirmationLink, tenantId, contactName, appointmentTitle) {
+  // Sandbox guard: when WHATSAPP_SANDBOX_MODE=true, the Twilio Sandbox requires
+  // each recipient to opt in. Skip the send and mark the reminder as 'skipped'
+  // to avoid recording a false 'sent' status for undelivered messages.
+  if (process.env.WHATSAPP_SANDBOX_MODE === 'true') {
+    console.warn('[WhatsApp] Sandbox mode: skipping send — recipient may not have opted in');
+    await supabase.from('reminders').update({ status: 'skipped' }).eq('id', reminderId);
+    return null;
+  }
+
   const contact = appointment.contacts || appointment.contact;
   const { scheduled_at } = appointment;
   const message = buildWhatsAppMessage(contact.name, scheduled_at, appointment.notes, confirmationLink);
@@ -54,6 +67,19 @@ async function sendReminderWhatsApp(reminderId, appointment, confirmationLink) {
       .eq('id', reminderId);
 
     if (error) throw error;
+
+    // Emit SSE event to tenant clients after successful send
+    const resolvedTenantId = tenantId || appointment.tenant_id;
+    if (resolvedTenantId) {
+      const resolvedContactName = contactName || contact.name;
+      const resolvedTitle = appointmentTitle || appointment.title;
+      sseManager.emit(resolvedTenantId, 'whatsapp-sent', {
+        reminderId,
+        contactName: resolvedContactName,
+        appointmentTitle: resolvedTitle,
+      });
+    }
+
     return data;
   } catch (err) {
     await supabase

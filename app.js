@@ -38,6 +38,11 @@ app.use(cors({
   preflightContinue: false,
   optionsSuccessStatus: 204
 }));
+// Stripe webhook — must be registered BEFORE express.json() to receive the raw body
+// for signature verification. express.json() would consume and discard the raw bytes.
+const { webhookHandler } = require('./routes/billing.routes');
+app.post('/api/billing/webhook', express.raw({ type: 'application/json' }), webhookHandler);
+
 app.use(express.json());
 
 // handle preflight for all routes

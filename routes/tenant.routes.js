@@ -24,9 +24,10 @@ router.get('/me', [authMiddleware, tenantMiddleware], async (req, res, next) => 
 // PUT /me — update tenant fields scoped to req.tenantId
 router.put('/me', [authMiddleware, tenantMiddleware], async (req, res, next) => {
   try {
+    const { name } = req.body;
     const { data, error } = await supabase
       .from('tenants')
-      .update(req.body)
+      .update({ name })
       .eq('id', req.tenantId)
       .select()
       .single();

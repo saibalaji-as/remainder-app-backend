@@ -146,8 +146,8 @@ describe('reminder.service - Property 5: Exactly Three Reminders With Correct Ti
 
             await reminderService.scheduleReminders(appointmentId, scheduledAt, 'both');
 
-            // 'both' = sms+email: sms 24h, sms 2h, email 30min, sms 2min TEST, email 2min TEST = 5 jobs
-            expect(mockQueueAdd).toHaveBeenCalledTimes(5);
+            // 'both' = sms+email: sms 24h, sms 2h, email 30min = 3 jobs (test offsets removed)
+            expect(mockQueueAdd).toHaveBeenCalledTimes(3);
 
             const calls = mockQueueAdd.mock.calls;
             const scheduledMs = scheduledAt.getTime();
@@ -258,7 +258,7 @@ describe('reminder.service - Property 7: Inserted Reminder Rows Have Correct Fie
 
             await reminderService.scheduleReminders(appointmentId, scheduledAt, 'both');
 
-            expect(insertedRows).toHaveLength(5);
+            expect(insertedRows).toHaveLength(3);
 
             for (const row of insertedRows) {
               expect(row.appointment_id).toBe(appointmentId);
@@ -351,8 +351,6 @@ describe('reminder.service - Property 9: Bull Job Options Are Always Correctly C
               24 * 60 * 60 * 1000,  // sms 24h
               2 * 60 * 60 * 1000,   // sms 2h
               30 * 60 * 1000,       // email 30min
-              2 * 60 * 1000,        // sms TEST 2min
-              2 * 60 * 1000,        // email TEST 2min
             ];
 
             let callCount = 0;
@@ -367,7 +365,7 @@ describe('reminder.service - Property 9: Bull Job Options Are Always Correctly C
 
             await reminderService.scheduleReminders(appointmentId, scheduledAt, 'both');
 
-            expect(mockQueueAdd).toHaveBeenCalledTimes(5);
+            expect(mockQueueAdd).toHaveBeenCalledTimes(3);
 
             const scheduledMs = scheduledAt.getTime();
 

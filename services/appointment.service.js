@@ -1,5 +1,5 @@
 const supabase = require('../config/supabase');
-const { scheduleReminders } = require('../services/reminder.service');
+const { scheduleReminders, skipPendingReminders } = require('./reminder.service');
 
 const listAppointments = async (tenantId) => {
   const { data, error } = await supabase
@@ -38,18 +38,52 @@ const createAppointment = async ({ tenantId, contactId, title, scheduledAt, remi
 };
 
 const updateAppointment = async (id, tenantId, payload) => {
+  // Enforce field whitelist: only allow snake_case whitelisted fields to reach Supabase.
+  // The controller maps camelCase → snake_case before calling this function.
+  const ALLOWED_FIELDS = ['title', 'notes', 'scheduled_at', 'reminder_channel'];
+  const safePayload = Object.fromEntries(
+    Object.entries(payload).filter(([key]) => ALLOWED_FIELDS.includes(key))
+  );
+
+  // Fetch the current appointment to detect scheduledAt changes before updating.
+  // Use snake_case key (scheduled_at) — the controller always maps to snake_case.
+  let currentAppointment = null;
+  if (safePayload.scheduled_at !== undefined) {
+    const { data: current, error: fetchError } = await supabase
+      .from('appointments')
+      .select('scheduled_at, reminder_channel')
+      .eq('id', id)
+      .eq('tenant_id', tenantId)
+      .single();
+    if (fetchError) throw fetchError;
+    currentAppointment = current;
+  }
+
   const { data, error } = await supabase
     .from('appointments')
-    .update(payload)
+    .update(safePayload)
     .eq('id', id)
     .eq('tenant_id', tenantId)
     .select()
     .single();
   if (error) throw error;
+
+  // Reschedule reminders if scheduled_at changed
+  if (
+    currentAppointment &&
+    safePayload.scheduled_at !== undefined &&
+    safePayload.scheduled_at !== currentAppointment.scheduled_at
+  ) {
+    const reminderChannel = safePayload.reminder_channel || currentAppointment.reminder_channel;
+    await skipPendingReminders(id);
+    await scheduleReminders(id, safePayload.scheduled_at, reminderChannel);
+  }
+
   return data;
 };
 
 const deleteAppointment = async (id, tenantId) => {
+  await skipPendingReminders(id);
   const { error } = await supabase
     .from('appointments')
     .delete()

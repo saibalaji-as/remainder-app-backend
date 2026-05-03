@@ -66,7 +66,14 @@ reminderQueue.process(async (job) => {
     if (!appointment.contacts?.phone) {
       throw new Error(`Contact has no phone number for reminder ${reminderId}`);
     }
-    await whatsappService.sendReminderWhatsApp(reminderId, appointment, confirmationLink);
+    await whatsappService.sendReminderWhatsApp(
+      reminderId,
+      appointment,
+      confirmationLink,
+      appointment.tenant_id,
+      appointment.contacts.name,
+      appointment.title
+    );
   } else {
     throw new Error(`Unknown reminder channel "${channel}" for reminder ${reminderId}`);
   }

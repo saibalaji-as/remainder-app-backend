@@ -141,8 +141,6 @@ async function respondToConfirmation(req, res, next) {
   }
 }
 
-module.exports = { getAppointmentByToken, respondToConfirmation, redirectByAppointmentId };
-
 /**
  * GET /api/confirm/r/:appointmentId
  *
@@ -173,3 +171,5 @@ async function redirectByAppointmentId(req, res, next) {
     return next(err);
   }
 }
+
+module.exports = { getAppointmentByToken, respondToConfirmation, redirectByAppointmentId };

@@ -24,7 +24,16 @@ router.get('/', contactsController.list);
 
 router.get('/:id', contactsController.getById);
 
-router.put('/:id', contactsController.update);
+router.put(
+  '/:id',
+  [
+    body('name').notEmpty(),
+    body('email').isEmail(),
+    body('phone').notEmpty(),
+  ],
+  validateMiddleware,
+  contactsController.update
+);
 
 router.delete('/:id', contactsController.remove);
 
