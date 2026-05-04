@@ -51,6 +51,8 @@ async function scheduleReminders(appointmentId, scheduledAt, reminderChannel = '
                    || reminderChannel === 'whatsapp_sms'
                    || reminderChannel === 'whatsapp_email' || reminderChannel === 'all';
 
+  console.log(`📋 scheduleReminders: channel="${reminderChannel}" → useEmail=${useEmail}, useSms=${useSms}, useWhatsApp=${useWhatsApp} for appointment ${appointmentId}`);
+
   const reminders = [
     ...(useSms       ? [{ offsetMs: 24 * 60 * 60 * 1000, channel: 'sms'      }] : []),  // 24h before
     ...(useSms       ? [{ offsetMs:  2 * 60 * 60 * 1000, channel: 'sms'      }] : []),  // 2h before
@@ -69,7 +71,7 @@ async function scheduleReminders(appointmentId, scheduledAt, reminderChannel = '
     const delay = reminderTime - Date.now();
 
     if (delay <= 0) {
-      console.log(`⏭ Skipping ${channel} reminder (window already passed) for appointment ${appointmentId}`);
+      console.log(`⏭ Skipping ${channel} reminder (window already passed, delay=${Math.round(delay / 1000)}s) for appointment ${appointmentId}`);
       continue; // skip past windows
     }
 
@@ -79,7 +81,10 @@ async function scheduleReminders(appointmentId, scheduledAt, reminderChannel = '
       .select()
       .single();
 
-    if (error) throw error;
+    if (error) {
+      console.error(`❌ Failed to insert ${channel} reminder for appointment ${appointmentId}:`, error.message);
+      throw error;
+    }
 
     await reminderQueue.add(
       {
@@ -94,7 +99,7 @@ async function scheduleReminders(appointmentId, scheduledAt, reminderChannel = '
       },
       { delay, attempts: 3, backoff: { type: 'exponential', delay: 5000 }, removeOnComplete: true, removeOnFail: false }
     );
-    console.log(`📅 Queued ${channel} reminder for appointment ${appointmentId} in ${Math.round(delay / 60000)}min`);
+    console.log(`📅 Queued ${channel} reminder for appointment ${appointmentId} in ${Math.round(delay / 60000)}min (delay=${delay}ms)`);
   }
 }
 

@@ -35,12 +35,9 @@ async function sendReminderSms(reminderId, appointment, confirmationLink) {
     if (error) throw error;
     return data;
   } catch (err) {
-    const { data, error } = await supabase
-      .from('reminders')
-      .update({ status: 'failed' })
-      .eq('id', reminderId);
-
-    if (error) throw error;
+    // Don't mark as failed here — Bull will retry up to the configured attempts.
+    // The processor's 'failed' event handler marks it failed only after all retries
+    // are exhausted, preventing a successful retry from leaving status as 'failed'.
     throw err;
   }
 }

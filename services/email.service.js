@@ -9,13 +9,14 @@ const supabase = require('../config/supabase');
  */
 function createTransporter() {
   return nodemailer.createTransport({
-    host: 'smtp.gmail.com',
-    port: 587,
-    secure: false, // STARTTLS — required on Render (port 465/SSL is blocked)
+    service: 'gmail',
     auth: {
       user: process.env.EMAIL_USER,
       pass: process.env.EMAIL_APP_PASSWORD,
     },
+    connectionTimeout: 10000,  // 10s to establish TCP connection
+    greetingTimeout: 10000,    // 10s to receive SMTP greeting
+    socketTimeout: 15000,      // 15s of inactivity before giving up
   });
 }
 
@@ -95,13 +96,9 @@ async function sendReminderEmail({ to, contactName, scheduledAt, notes, tenantId
 
     return result;
   } catch (err) {
-    // Mark reminder as failed
-    if (reminderId) {
-      await supabase
-        .from('reminders')
-        .update({ status: 'failed' })
-        .eq('id', reminderId);
-    }
+    // Don't mark as failed here — Bull will retry up to the configured attempts.
+    // The processor's 'failed' event handler marks it failed only after all retries
+    // are exhausted, preventing a successful retry from leaving status as 'failed'.
     throw err;
   }
 }
