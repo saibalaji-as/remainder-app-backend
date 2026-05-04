@@ -15,6 +15,9 @@ router.use(authMiddleware, tenantMiddleware);
  */
 router.post('/subscribe', async (req, res, next) => {
   try {
+    if (!pushService.pushEnabled) {
+      return res.status(503).json({ message: 'Push notifications not configured on this server' });
+    }
     const { endpoint, keys } = req.body;
 
     if (!endpoint || !keys?.p256dh || !keys?.auth) {

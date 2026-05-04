@@ -10,12 +10,24 @@
 const webpush = require('web-push');
 const supabase = require('../config/supabase');
 
-// Configure VAPID — required once at module load
-webpush.setVapidDetails(
-  `mailto:${process.env.VAPID_EMAIL || process.env.EMAIL_USER || 'admin@schedify.app'}`,
-  process.env.VAPID_PUBLIC_KEY,
-  process.env.VAPID_PRIVATE_KEY
-);
+// Configure VAPID — only if keys are present
+const VAPID_PUBLIC  = process.env.VAPID_PUBLIC_KEY;
+const VAPID_PRIVATE = process.env.VAPID_PRIVATE_KEY;
+const VAPID_EMAIL   = process.env.VAPID_EMAIL || process.env.EMAIL_USER || 'admin@schedify.app';
+
+let pushEnabled = false;
+
+if (VAPID_PUBLIC && VAPID_PRIVATE) {
+  try {
+    webpush.setVapidDetails(`mailto:${VAPID_EMAIL}`, VAPID_PUBLIC, VAPID_PRIVATE);
+    pushEnabled = true;
+    console.log('✅ Web Push enabled');
+  } catch (err) {
+    console.error('❌ Web Push — invalid VAPID keys:', err.message);
+  }
+} else {
+  console.warn('⚠️  Web Push disabled — VAPID_PUBLIC_KEY or VAPID_PRIVATE_KEY not set');
+}
 
 /**
  * Save (upsert) a push subscription for a user.
@@ -25,6 +37,7 @@ webpush.setVapidDetails(
  * @param {{ endpoint: string, keys: { p256dh: string, auth: string } }} subscription
  */
 async function saveSubscription(tenantId, userId, subscription) {
+  if (!pushEnabled) throw new Error('Web Push is not configured on this server');
   const { endpoint, keys } = subscription;
   const { error } = await supabase
     .from('push_subscriptions')
@@ -60,6 +73,7 @@ async function removeSubscription(tenantId, userId, endpoint) {
  * @param {{ title: string, body: string, data?: object }} payload
  */
 async function sendToTenant(tenantId, payload) {
+  if (!pushEnabled) return; // silently skip — no VAPID keys configured
   const { data: subs, error } = await supabase
     .from('push_subscriptions')
     .select('*')
@@ -108,4 +122,4 @@ async function sendToTenant(tenantId, payload) {
   }
 }
 
-module.exports = { saveSubscription, removeSubscription, sendToTenant };
+module.exports = { saveSubscription, removeSubscription, sendToTenant, pushEnabled };
