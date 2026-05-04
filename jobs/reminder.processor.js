@@ -44,7 +44,10 @@ reminderQueue.process(async (job) => {
   // Short link for SMS — keeps message under 160 chars to avoid multi-segment issues
   const smsConfirmationLink = `${process.env.BACKEND_URL || `http://localhost:${process.env.PORT || 3000}`}/api/confirm/r/${appointmentId}`;
 
-  console.log(`🔗 Confirmation link generated for appointmentId: ${appointmentId}`);
+  console.log(`🔗 FRONTEND_URL env: ${process.env.FRONTEND_URL}`);
+  console.log(`🔗 BACKEND_URL env: ${process.env.BACKEND_URL}`);
+  console.log(`🔗 Confirmation link: ${confirmationLink}`);
+  console.log(`🔗 SMS link: ${smsConfirmationLink}`);
 
   if (channel === 'sms') {
     await smsService.sendReminderSms(reminderId, appointment, smsConfirmationLink);
