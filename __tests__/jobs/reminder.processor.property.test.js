@@ -82,6 +82,8 @@ function makeJob(overrides = {}) {
       reminderId: 'reminder-1',
       appointmentId: 'appt-1',
       channel: 'sms',
+      frontendUrl: 'https://schedifyio.netlify.app',
+      backendUrl: 'https://remainder-app-backend.onrender.com',
       ...overrides,
     },
   };
@@ -165,14 +167,15 @@ describe('Feature: b2b-reminder-job-queue, Property 2: Channel Routing Dispatche
           const job = makeJob({ channel });
           await registeredProcessor(job);
 
-          const expectedConfirmationLink = `${process.env.FRONTEND_URL}/confirm?token=${FAKE_TOKEN}`;
+          const expectedEmailLink = `${job.data.frontendUrl}/confirm?token=${FAKE_TOKEN}`;
+          const expectedSmsLink = `${job.data.backendUrl}/api/confirm/r/${job.data.appointmentId}`;
 
           if (channel === 'sms') {
             expect(mockSendReminderSms).toHaveBeenCalledTimes(1);
             expect(mockSendReminderSms).toHaveBeenCalledWith(
               job.data.reminderId,
               appointment,
-              expectedConfirmationLink
+              expectedSmsLink
             );
             expect(mockSendReminderEmail).not.toHaveBeenCalled();
           } else if (channel === 'email') {
@@ -185,7 +188,7 @@ describe('Feature: b2b-reminder-job-queue, Property 2: Channel Routing Dispatche
               tenantId: appointment.tenant_id,
               reminderId: job.data.reminderId,
               appointmentTitle: appointment.title,
-              confirmationLink: expectedConfirmationLink,
+              confirmationLink: expectedEmailLink,
             });
             expect(mockSendReminderSms).not.toHaveBeenCalled();
           }

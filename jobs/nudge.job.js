@@ -15,8 +15,8 @@ const supabase = require('../config/supabase');
 const sseManager = require('../sse.manager');
 const pushService = require('../services/push.service');
 
-const INTERVAL_MS  = 120_000; // 2 minutes — testing
-const NUDGE_GAP_MS = 100_000; // ~1.5 minutes — slightly less than interval to avoid drift gaps
+const INTERVAL_MS  = 300_000; // 5 minutes
+const NUDGE_GAP_MS = 270_000; // 4.5 minutes — slightly less than interval to avoid drift gaps
 
 /**
  * Start the nudge background job.
@@ -76,6 +76,7 @@ function startNudgeJob() {
               url: '/appointments',
               appointmentId: row.id,
             },
+            tag: `nudge-${row.id}`, // replaces previous notification for same appointment
           }).then(() => {
             console.log(`🔔 Nudge job — push sent for appointment ${row.id} to tenant ${tenantId}`);
           }).catch(err =>

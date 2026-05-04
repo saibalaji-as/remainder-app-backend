@@ -6,7 +6,7 @@ const whatsappService = require('../services/whatsapp.service');
 const supabase = require('../config/supabase');
 
 reminderQueue.process(async (job) => {
-  const { reminderId, appointmentId, channel } = job.data;
+  const { reminderId, appointmentId, channel, frontendUrl, backendUrl } = job.data;
 
   const { data: appointment, error } = await supabase
     .from('appointments')
@@ -40,14 +40,21 @@ reminderQueue.process(async (job) => {
 
   if (tokenUpdateError) throw tokenUpdateError;
 
-  const confirmationLink = `${process.env.FRONTEND_URL}/confirm?token=${token}`;
+  // Use URLs from job data (snapshotted at queue time) with fallback to process.env
+  // for backward compatibility with jobs queued before this change
+  const effectiveFrontendUrl = frontendUrl || process.env.FRONTEND_URL;
+  const effectiveBackendUrl = backendUrl || process.env.BACKEND_URL || `http://localhost:${process.env.PORT || 3000}`;
+
+  const confirmationLink = `${effectiveFrontendUrl}/confirm?token=${token}`;
   // Short link for SMS — keeps message under 160 chars to avoid multi-segment issues
-  const smsConfirmationLink = `${process.env.BACKEND_URL || `http://localhost:${process.env.PORT || 3000}`}/api/confirm/r/${appointmentId}`;
+  const smsConfirmationLink = `${effectiveBackendUrl}/api/confirm/r/${appointmentId}`;
 
   console.log(`🔗 FRONTEND_URL env: ${process.env.FRONTEND_URL}`);
   console.log(`🔗 BACKEND_URL env: ${process.env.BACKEND_URL}`);
-  console.log(`🔗 Confirmation link: ${confirmationLink}`);
-  console.log(`🔗 SMS link: ${smsConfirmationLink}`);
+  console.log(`🔗 Job data frontendUrl: ${frontendUrl}`);
+  console.log(`🔗 Job data backendUrl: ${backendUrl}`);
+  console.log(`🔗 Effective confirmation link: ${confirmationLink}`);
+  console.log(`🔗 Effective SMS link: ${smsConfirmationLink}`);
 
   if (channel === 'sms') {
     await smsService.sendReminderSms(reminderId, appointment, smsConfirmationLink);

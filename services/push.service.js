@@ -96,6 +96,7 @@ async function sendToTenant(tenantId, payload) {
     body:  payload.body,
     icon:  'assets/icons/icon-192x192.png',
     badge: 'assets/icons/icon-72x72.png',
+    tag:   payload.tag,  // replaces previous notification with same tag
     data:  payload.data ?? {},
   });
 

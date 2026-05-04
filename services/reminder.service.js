@@ -82,7 +82,16 @@ async function scheduleReminders(appointmentId, scheduledAt, reminderChannel = '
     if (error) throw error;
 
     await reminderQueue.add(
-      { reminderId: data.id, appointmentId, channel },
+      {
+        reminderId: data.id,
+        appointmentId,
+        channel,
+        // Snapshot URLs at queue time so the processor always uses the correct
+        // values regardless of env var changes or instance restarts between
+        // scheduling and execution.
+        frontendUrl: process.env.FRONTEND_URL,
+        backendUrl: process.env.BACKEND_URL,
+      },
       { delay, attempts: 3, backoff: { type: 'exponential', delay: 5000 }, removeOnComplete: true, removeOnFail: false }
     );
     console.log(`📅 Queued ${channel} reminder for appointment ${appointmentId} in ${Math.round(delay / 60000)}min`);
@@ -124,7 +133,13 @@ const retryReminder = async (tenantId, reminderId) => {
   // Enqueue a new BullMQ job; roll back on failure
   try {
     await reminderQueue.add(
-      { reminderId: reminder.id, appointmentId: reminder.appointment_id, channel: reminder.channel },
+      {
+        reminderId: reminder.id,
+        appointmentId: reminder.appointment_id,
+        channel: reminder.channel,
+        frontendUrl: process.env.FRONTEND_URL,
+        backendUrl: process.env.BACKEND_URL,
+      },
       { delay: 0, attempts: 3, backoff: { type: 'exponential', delay: 5000 }, removeOnComplete: true, removeOnFail: false }
     );
   } catch (enqueueError) {
