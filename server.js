@@ -20,6 +20,7 @@ app.listen(PORT, () => {
   }
 
   // Load processor to start consuming jobs
+  console.log('Loading reminder processor...');
   require('./jobs/reminder.processor');
   console.log('⚙️ Reminder job processor started');
 

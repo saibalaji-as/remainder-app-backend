@@ -57,6 +57,11 @@ async function scheduleReminders(appointmentId, scheduledAt, reminderChannel = '
     ...(useWhatsApp  ? [{ offsetMs: 24 * 60 * 60 * 1000, channel: 'whatsapp' }] : []),  // 24h before
     ...(useWhatsApp  ? [{ offsetMs:  2 * 60 * 60 * 1000, channel: 'whatsapp' }] : []),  // 2h before
     ...(useEmail     ? [{ offsetMs:      30 * 60 * 1000, channel: 'email'    }] : []),  // 30min before
+
+    // Test
+    ...(useSms     ? [{ offsetMs:      2 * 60 * 1000, channel: 'sms'    }] : []),  // 2min before
+    ...(useEmail     ? [{ offsetMs:      2 * 60 * 1000, channel: 'email'    }] : []),  // 2min before
+    ...(useWhatsApp     ? [{ offsetMs:      2 * 60 * 1000, channel: 'whatsapp'    }] : []),  // 2min before
   ];
 
   for (const { offsetMs, channel } of reminders) {

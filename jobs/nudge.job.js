@@ -12,6 +12,7 @@
 
 const supabase = require('../config/supabase');
 const sseManager = require('../sse.manager');
+const pushService = require('../services/push.service');
 
 const INTERVAL_MS = 300_000; // 5 minutes
 
@@ -38,22 +39,44 @@ function startNudgeJob() {
         return;
       }
 
-      if (!appointments || appointments.length === 0) return;
+      if (!appointments || appointments.length === 0) {
+        console.log('⏰ Nudge job — no past-due appointments found');
+        return;
+      }
+
+      console.log(`⏰ Nudge job — found ${appointments.length} past-due appointment(s)`);
 
       for (const row of appointments) {
         try {
           const tenantId = row.tenant_id;
 
           // Requirement 4.6 — skip if no SSE clients are connected for this tenant
-          if (!sseManager.hasClients(tenantId)) continue;
+          if (!sseManager.hasClients(tenantId)) {
+            console.warn(`⏰ Nudge job — skipping appointment ${row.id}: no SSE clients connected for tenant ${tenantId}`);
+            continue;
+          }
 
-          // Requirement 4.2 — emit nudge event
+          // Requirement 4.2 — emit nudge event via SSE (for users with tab open)
           sseManager.emit(tenantId, 'appointment-needs-update', {
             appointmentId: row.id,
             title: row.title,
             contactName: row.contacts?.name ?? null,
             scheduledAt: row.scheduled_at,
           });
+          console.log(`📣 Nudge job — emitted nudge for appointment ${row.id} to tenant ${tenantId}`);
+
+          // Send Web Push notification (reaches users even when tab is closed)
+          const contactName = row.contacts?.name ?? 'a contact';
+          pushService.sendToTenant(tenantId, {
+            title: '📅 Appointment needs attention',
+            body: `"${row.title}" with ${contactName} is past due — please update the status.`,
+            data: {
+              url: '/appointments',
+              appointmentId: row.id,
+            },
+          }).catch(err =>
+            console.error(`❌ Nudge job — push notification failed for appointment ${row.id}:`, err.message)
+          );
 
           // Requirement 4.3 — record nudge timestamp to prevent duplicates within 1 hour
           const { error: updateError } = await supabase

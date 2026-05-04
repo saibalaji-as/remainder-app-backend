@@ -11,6 +11,7 @@ const billingRoutes = require('./routes/billing.routes');
 const statsRoutes = require('./routes/stats');
 const templatesRoutes = require('./routes/templates.routes');
 const confirmRoutes = require('./routes/confirm.routes');
+const pushRoutes = require('./routes/push.routes');
 
 const app = express();
 
@@ -33,7 +34,7 @@ app.use(cors({
     }
   },
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Cache-Control'],
   credentials: true,
   preflightContinue: false,
   optionsSuccessStatus: 204
@@ -59,6 +60,7 @@ app.use('/api/reminders', remindersRoutes);
 app.use('/api/billing', billingRoutes);
 app.use('/api/dashboard', statsRoutes);
 app.use('/api/email-templates', templatesRoutes);
+app.use('/api/push', pushRoutes);
 
 // SSE endpoint — must be registered after CORS/auth middleware
 const authMiddleware = require('./middleware/auth.middleware');

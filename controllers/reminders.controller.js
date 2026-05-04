@@ -38,11 +38,19 @@ function stream(req, res, next) {
     res.setHeader('Content-Type', 'text/event-stream');
     res.setHeader('Cache-Control', 'no-cache');
     res.setHeader('Connection', 'keep-alive');
+    res.setHeader('X-Accel-Buffering', 'no'); // disable Nginx buffering
     res.flushHeaders();
 
     sseManager.addClient(req.tenantId, res);
 
+    // Send a keepalive comment every 25s to prevent proxies/browsers
+    // from closing the connection due to inactivity (504 timeout)
+    const keepalive = setInterval(() => {
+      res.write(': keepalive\n\n');
+    }, 25_000);
+
     req.on('close', () => {
+      clearInterval(keepalive);
       sseManager.removeClient(req.tenantId, res);
     });
 
