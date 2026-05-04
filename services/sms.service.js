@@ -35,6 +35,8 @@ async function sendReminderSms(reminderId, appointment, confirmationLink) {
     if (error) throw error;
     return data;
   } catch (err) {
+    // Log Twilio-specific error details to help diagnose delivery failures
+    console.error(`❌ SMS send failed for reminder ${reminderId} to ${phone}:`, err.message, err.code ? `(Twilio code: ${err.code})` : '');
     // Don't mark as failed here — Bull will retry up to the configured attempts.
     // The processor's 'failed' event handler marks it failed only after all retries
     // are exhausted, preventing a successful retry from leaving status as 'failed'.

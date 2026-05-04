@@ -9,14 +9,16 @@ const supabase = require('../config/supabase');
  */
 function createTransporter() {
   return nodemailer.createTransport({
-    service: 'gmail',
+    host: 'smtp.gmail.com',
+    port: 587,
+    secure: false,  // STARTTLS — port 465 (SSL) is blocked on Render free tier
     auth: {
       user: process.env.EMAIL_USER,
       pass: process.env.EMAIL_APP_PASSWORD,
     },
-    connectionTimeout: 10000,  // 10s to establish TCP connection
-    greetingTimeout: 10000,    // 10s to receive SMTP greeting
-    socketTimeout: 15000,      // 15s of inactivity before giving up
+    connectionTimeout: 10000,
+    greetingTimeout: 10000,
+    socketTimeout: 15000,
   });
 }
 
