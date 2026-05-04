@@ -9,7 +9,9 @@ const supabase = require('../config/supabase');
  */
 function createTransporter() {
   return nodemailer.createTransport({
-    service: 'gmail',
+    host: 'smtp.gmail.com',
+    port: 587,
+    secure: false, // STARTTLS — required on Render (port 465/SSL is blocked)
     auth: {
       user: process.env.EMAIL_USER,
       pass: process.env.EMAIL_APP_PASSWORD,
