@@ -84,7 +84,12 @@ async function sendToTenant(tenantId, payload) {
     return;
   }
 
-  if (!subs || subs.length === 0) return;
+  if (!subs || subs.length === 0) {
+    console.log(`🔔 Push — no subscriptions found for tenant ${tenantId}`);
+    return;
+  }
+
+  console.log(`🔔 Push — sending to ${subs.length} subscription(s) for tenant ${tenantId}`);
 
   const notification = JSON.stringify({
     title: payload.title,

@@ -3,9 +3,10 @@
  *
  * Runs every 5 minutes. Queries for past-due appointments that still have an
  * actionable status ('scheduled' or 'confirmed') and have not been nudged in
- * the last hour. For each such appointment, emits an SSE
- * `appointment-needs-update` event to the tenant's connected clients and
- * records the nudge timestamp so duplicates are suppressed.
+ * the last 5 minutes. For each such appointment, emits an SSE
+ * `appointment-needs-update` event and a Web Push notification.
+ * Nudging repeats every 5 minutes until the user marks the appointment
+ * completed or cancelled.
  *
  * Requirements: 4.1, 4.2, 4.3, 4.6
  */
@@ -14,7 +15,8 @@ const supabase = require('../config/supabase');
 const sseManager = require('../sse.manager');
 const pushService = require('../services/push.service');
 
-const INTERVAL_MS = 300_000; // 5 minutes
+const INTERVAL_MS  = 120_000; // 2 minutes — testing
+const NUDGE_GAP_MS = 100_000; // ~1.5 minutes — slightly less than interval to avoid drift gaps
 
 /**
  * Start the nudge background job.
@@ -25,14 +27,15 @@ const INTERVAL_MS = 300_000; // 5 minutes
 function startNudgeJob() {
   const handle = setInterval(async () => {
     try {
-      const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000).toISOString();
+      // nudge_sent_at is null (never nudged) OR last nudge was >4.5 min ago
+      const nudgeGapAgo = new Date(Date.now() - NUDGE_GAP_MS).toISOString();
 
       const { data: appointments, error } = await supabase
         .from('appointments')
         .select('*, contacts(*)')
         .lt('scheduled_at', new Date().toISOString())
         .in('status', ['scheduled', 'confirmed'])
-        .or(`nudge_sent_at.is.null,nudge_sent_at.lt.${oneHourAgo}`);
+        .or(`nudge_sent_at.is.null,nudge_sent_at.lt.${nudgeGapAgo}`);
 
       if (error) {
         console.error('❌ Nudge job — Supabase query failed:', error.message);
@@ -73,6 +76,8 @@ function startNudgeJob() {
               url: '/appointments',
               appointmentId: row.id,
             },
+          }).then(() => {
+            console.log(`🔔 Nudge job — push sent for appointment ${row.id} to tenant ${tenantId}`);
           }).catch(err =>
             console.error(`❌ Nudge job — push failed for appointment ${row.id}:`, err.message)
           );

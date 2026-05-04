@@ -15,6 +15,10 @@ const pushRoutes = require('./routes/push.routes');
 
 const app = express();
 
+// Trust the first proxy hop (Render, Heroku, Nginx, etc.)
+// Required for express-rate-limit to correctly read client IPs from X-Forwarded-For
+app.set('trust proxy', 1);
+
 app.use(helmet());
 const allowedOrigins = (process.env.CORS_ORIGIN || 'http://localhost:4200')
   .split(',')
