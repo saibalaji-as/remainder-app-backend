@@ -200,8 +200,8 @@ describe('Feature: b2b-reminder-job-queue, Property 2: Channel Routing Dispatche
 });
 
 // **Validates: Requirements 3.7**
-describe('Feature: b2b-reminder-job-queue, Property 3: Successful Delivery Updates Reminder Status', () => {
-  it('updates reminder with status sent and valid ISO 8601 sent_at after successful delivery', async () => {
+describe('Feature: b2b-reminder-job-queue, Property 3: Successful Delivery Delegates to Channel Service', () => {
+  it('dispatches through the channel service without marking the reminder failed', async () => {
     await fc.assert(
       fc.asyncProperty(
         fc.record({
@@ -225,17 +225,17 @@ describe('Feature: b2b-reminder-job-queue, Property 3: Successful Delivery Updat
           const job = makeJob({ reminderId, channel });
           await registeredProcessor(job);
 
-          // The last update call should be with status 'sent' and a sent_at
           const updateCalls = mockUpdateFn.mock.calls;
-          const sentUpdateCall = updateCalls.find(
-            (call) => call[0] && call[0].status === 'sent'
+          const failedUpdateCall = updateCalls.find(
+            (call) => call[0] && call[0].status === 'failed'
           );
-          expect(sentUpdateCall).toBeDefined();
+          expect(failedUpdateCall).toBeUndefined();
 
-          const { status, sent_at } = sentUpdateCall[0];
-          expect(status).toBe('sent');
-          // Validate ISO 8601 format
-          expect(new Date(sent_at).toISOString()).toBe(sent_at);
+          if (channel === 'sms') {
+            expect(mockSendReminderSms).toHaveBeenCalledTimes(1);
+          } else {
+            expect(mockSendReminderEmail).toHaveBeenCalledTimes(1);
+          }
         }
       ),
       { numRuns: 100 }

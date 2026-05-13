@@ -1,8 +1,16 @@
 const supabase = require('../config/supabase');
 
+function contactPayload(body) {
+  const payload = {};
+  if (body.name !== undefined) payload.name = body.name;
+  if (body.email !== undefined) payload.email = body.email;
+  if (body.phone !== undefined) payload.phone = body.phone;
+  return payload;
+}
+
 async function create(req, res, next) {
   try {
-    const { name, email, phone } = req.body;
+    const { name, email, phone } = contactPayload(req.body);
     const { data, error } = await supabase
       .from('contacts')
       .insert({ tenant_id: req.tenantId, name, email, phone })
@@ -48,7 +56,7 @@ async function update(req, res, next) {
   try {
     const { data, error } = await supabase
       .from('contacts')
-      .update(req.body)
+      .update(contactPayload(req.body))
       .eq('id', req.params.id)
       .eq('tenant_id', req.tenantId)
       .select()
@@ -78,4 +86,4 @@ async function remove(req, res, next) {
   }
 }
 
-module.exports = { create, list, getById, update, remove };
+module.exports = { create, list, getById, update, remove, contactPayload };

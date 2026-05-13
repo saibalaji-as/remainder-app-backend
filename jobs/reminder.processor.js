@@ -17,7 +17,7 @@ reminderQueue.process(async (job) => {
   if (error) throw error;
   if (!appointment) throw new Error('Appointment not found');
 
-  if (appointment.status === 'cancelled') {
+  if (appointment.status === 'cancelled' || appointment.status === 'completed') {
     await supabase
       .from('reminders')
       .update({ status: 'skipped' })

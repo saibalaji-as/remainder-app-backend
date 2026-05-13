@@ -164,12 +164,12 @@ async function fetchStatsCounts(tenantId) {
       .eq('appointments.tenant_id', tenantId)
       .eq('status', 'failed'),
 
-    // 5. Reminders with status = 'delivered' (delivery rate numerator)
+    // 5. Reminders accepted by the delivery provider (delivery rate numerator)
     supabase
       .from('reminders')
       .select('*, appointments!inner(tenant_id)', { count: 'exact', head: true })
       .eq('appointments.tenant_id', tenantId)
-      .eq('status', 'delivered'),
+      .eq('status', 'sent'),
 
     // 6. Non-pending reminders (delivery rate denominator)
     supabase

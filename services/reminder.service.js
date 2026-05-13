@@ -59,12 +59,15 @@ async function scheduleReminders(appointmentId, scheduledAt, reminderChannel = '
     ...(useWhatsApp  ? [{ offsetMs: 24 * 60 * 60 * 1000, channel: 'whatsapp' }] : []),  // 24h before
     ...(useWhatsApp  ? [{ offsetMs:  2 * 60 * 60 * 1000, channel: 'whatsapp' }] : []),  // 2h before
     ...(useEmail     ? [{ offsetMs:      30 * 60 * 1000, channel: 'email'    }] : []),  // 30min before
-
-    // Test
-    ...(useSms     ? [{ offsetMs:      2 * 60 * 1000, channel: 'sms'    }] : []),  // 2min before
-    ...(useEmail     ? [{ offsetMs:      2 * 60 * 1000, channel: 'email'    }] : []),  // 2min before
-    ...(useWhatsApp     ? [{ offsetMs:      2 * 60 * 1000, channel: 'whatsapp'    }] : []),  // 2min before
   ];
+
+  if (process.env.ENABLE_TEST_REMINDERS === 'true') {
+    reminders.push(
+      ...(useSms      ? [{ offsetMs: 2 * 60 * 1000, channel: 'sms'      }] : []),
+      ...(useEmail    ? [{ offsetMs: 2 * 60 * 1000, channel: 'email'    }] : []),
+      ...(useWhatsApp ? [{ offsetMs: 2 * 60 * 1000, channel: 'whatsapp' }] : [])
+    );
+  }
 
   for (const { offsetMs, channel } of reminders) {
     const reminderTime = new Date(scheduledAt).getTime() - offsetMs;

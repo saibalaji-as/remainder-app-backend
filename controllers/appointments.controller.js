@@ -107,7 +107,7 @@ async function updateStatus(req, res, next) {
     if (updateError) return next(updateError);
 
     // Side effects based on new status
-    if (newStatus === 'cancelled') {
+    if (newStatus === 'cancelled' || newStatus === 'completed') {
       await skipPendingReminders(id);
     }
 

@@ -22,6 +22,15 @@ function verifyToken(token) {
   return jwt.verify(token, process.env.JWT_SECRET);
 }
 
+function toPublicUser(user) {
+  return {
+    id: user.id,
+    name: user.name,
+    email: user.email,
+    role: user.role,
+  };
+}
+
 async function register({ name, email, password, tenantName }) {
   const { data: tenant, error: tenantError } = await supabase
     .from('tenants')
@@ -40,7 +49,7 @@ async function register({ name, email, password, tenantName }) {
   if (userError) throw userError;
 
   const token = signToken({ userId: user.id, tenantId: tenant.id, email: user.email });
-  return { token };
+  return { token, user: toPublicUser(user) };
 }
 
 async function login({ email, password }) {
@@ -67,7 +76,7 @@ async function login({ email, password }) {
   }
 
   const token = signToken({ userId: user.id, tenantId: user.tenant_id, email: user.email });
-  return { token };
+  return { token, user: toPublicUser(user) };
 }
 
-module.exports = { hashPassword, verifyPassword, signToken, verifyToken, register, login };
+module.exports = { hashPassword, verifyPassword, signToken, verifyToken, register, login, toPublicUser };
