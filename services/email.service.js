@@ -7,6 +7,13 @@ function shortErrorMessage(err) {
   return String(err?.message || err || 'Unknown email error').slice(0, 500);
 }
 
+function shouldUseResend() {
+  const provider = (process.env.EMAIL_PROVIDER || '').toLowerCase();
+  if (provider === 'smtp') return false;
+  if (provider === 'resend') return true;
+  return Boolean(process.env.RESEND_API_KEY);
+}
+
 /**
  * Creates a fresh Nodemailer transporter using current env vars.
  * Called per-send so credentials are always read from the live process env.
@@ -107,7 +114,8 @@ async function sendReminderEmail({ to, contactName, scheduledAt, notes, tenantId
       throw new Error('Email sender not configured. Set EMAIL_FROM in .env');
     }
 
-    const result = process.env.RESEND_API_KEY
+    const useResend = shouldUseResend();
+    const result = useResend
       ? await sendWithResend({ from, to, subject: rendered.subject, html })
       : await sendWithSmtp({ from, to, subject: rendered.subject, html });
 
@@ -125,7 +133,7 @@ async function sendReminderEmail({ to, contactName, scheduledAt, notes, tenantId
           status: 'sent',
           sent_at: new Date().toISOString(),
           provider_message_id: result?.id || result?.messageId || null,
-          provider_status: process.env.RESEND_API_KEY ? 'resend_accepted' : 'smtp_accepted',
+          provider_status: useResend ? 'resend_accepted' : 'smtp_accepted',
           provider_error_code: null,
         })
         .eq('id', reminderId);
@@ -137,7 +145,7 @@ async function sendReminderEmail({ to, contactName, scheduledAt, notes, tenantId
       await supabase
         .from('reminders')
         .update({
-          provider_status: process.env.RESEND_API_KEY ? 'resend_failed_attempt' : 'smtp_failed_attempt',
+          provider_status: shouldUseResend() ? 'resend_failed_attempt' : 'smtp_failed_attempt',
           provider_error_code: shortErrorMessage(err),
         })
         .eq('id', reminderId);
@@ -150,4 +158,4 @@ async function sendReminderEmail({ to, contactName, scheduledAt, notes, tenantId
   }
 }
 
-module.exports = { sendReminderEmail, sendWithResend, sendWithSmtp };
+module.exports = { sendReminderEmail, sendWithResend, sendWithSmtp, shouldUseResend };
