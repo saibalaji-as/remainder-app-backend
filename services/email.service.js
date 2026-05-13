@@ -9,17 +9,45 @@ const supabase = require('../config/supabase');
  */
 function createTransporter() {
   return nodemailer.createTransport({
-    host: 'smtp.gmail.com',
-    port: 587,
-    secure: false,  // STARTTLS — port 465 (SSL) is blocked on Render free tier
+    host: process.env.SMTP_HOST || 'smtp.gmail.com',
+    port: parseInt(process.env.SMTP_PORT || '587', 10),
+    secure: process.env.SMTP_PORT === '465', // true only for port 465
     auth: {
       user: process.env.EMAIL_USER,
       pass: process.env.EMAIL_APP_PASSWORD,
     },
-    connectionTimeout: 10000,
-    greetingTimeout: 10000,
-    socketTimeout: 15000,
+    connectionTimeout: 15000,
+    greetingTimeout: 15000,
+    socketTimeout: 20000,
   });
+}
+
+async function sendWithResend({ from, to, subject, html }) {
+  const response = await fetch('https://api.resend.com/emails', {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${process.env.RESEND_API_KEY}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ from, to, subject, html }),
+  });
+
+  const body = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    const message = body?.message || body?.error || `Resend request failed with ${response.status}`;
+    throw new Error(message);
+  }
+
+  return body;
+}
+
+async function sendWithSmtp({ from, to, subject, html }) {
+  if (!process.env.EMAIL_USER || !process.env.EMAIL_APP_PASSWORD) {
+    throw new Error('Email credentials not configured. Set RESEND_API_KEY or EMAIL_USER and EMAIL_APP_PASSWORD in .env');
+  }
+
+  const transporter = createTransporter();
+  return transporter.sendMail({ from, to, subject, html });
 }
 
 /**
@@ -70,18 +98,14 @@ async function sendReminderEmail({ to, contactName, scheduledAt, notes, tenantId
   const html = `<p>${rendered.greeting}</p>\n<p>${htmlBody}</p>\n${confirmationButtons}<p>${rendered.closing}</p>`;
 
   try {
-    if (!process.env.EMAIL_USER || !process.env.EMAIL_APP_PASSWORD) {
-      throw new Error('Email credentials not configured. Set EMAIL_USER and EMAIL_APP_PASSWORD in .env');
+    const from = process.env.EMAIL_FROM || process.env.EMAIL_USER;
+    if (!from) {
+      throw new Error('Email sender not configured. Set EMAIL_FROM in .env');
     }
 
-    const transporter = createTransporter();
-
-    const result = await transporter.sendMail({
-      from: process.env.EMAIL_USER,
-      to,
-      subject: rendered.subject,
-      html,
-    });
+    const result = process.env.RESEND_API_KEY
+      ? await sendWithResend({ from, to, subject: rendered.subject, html })
+      : await sendWithSmtp({ from, to, subject: rendered.subject, html });
 
     // Emit SSE event to tenant clients after successful send
     if (tenantId !== undefined && tenantId !== null) {
@@ -105,4 +129,4 @@ async function sendReminderEmail({ to, contactName, scheduledAt, notes, tenantId
   }
 }
 
-module.exports = { sendReminderEmail };
+module.exports = { sendReminderEmail, sendWithResend, sendWithSmtp };

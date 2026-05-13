@@ -12,8 +12,12 @@ const statsRoutes = require('./routes/stats');
 const templatesRoutes = require('./routes/templates.routes');
 const confirmRoutes = require('./routes/confirm.routes');
 const pushRoutes = require('./routes/push.routes');
+const webhooksRoutes = require('./routes/webhooks.routes');
 
 const app = express();
+
+// Health check — used by keep-alive ping to prevent Render free tier spin-down
+app.get('/health', (req, res) => res.json({ status: 'ok' }));
 
 // Trust the first proxy hop (Render, Heroku, Nginx, etc.)
 // Required for express-rate-limit to correctly read client IPs from X-Forwarded-For
@@ -55,6 +59,7 @@ app.options('*', cors());
 
 // Public routes — no auth middleware (must be registered before auth-protected routes)
 app.use('/api/confirm', confirmRoutes);
+app.use('/api/webhooks', webhooksRoutes);
 
 app.use('/api/auth', authRoutes);
 app.use('/api/tenants', tenantRoutes);
@@ -75,6 +80,35 @@ app.get('/api/sse/reminders', authMiddleware, tenantMiddleware, remindersControl
 if (process.env.NODE_ENV !== 'production') {
   const testRoutes = require('./routes/test.routes');
   app.use('/api/test', testRoutes);
+}
+
+if (process.env.NODE_ENV !== 'production' && process.env.SMTP_DIAG_ENABLED === 'true') {
+  app.get('/api/diag/smtp', async (req, res) => {
+    const nodemailer = require('nodemailer');
+    const transporter = nodemailer.createTransport({
+      host: process.env.SMTP_HOST || 'smtp.gmail.com',
+      port: parseInt(process.env.SMTP_PORT || '587', 10),
+      secure: process.env.SMTP_PORT === '465',
+      auth: {
+        user: process.env.EMAIL_USER,
+        pass: process.env.EMAIL_APP_PASSWORD,
+      },
+      connectionTimeout: 10000,
+      greetingTimeout: 10000,
+      socketTimeout: 15000,
+    });
+    try {
+      await transporter.verify();
+      return res.json({ ok: true, message: 'SMTP connection verified' });
+    } catch (err) {
+      return res.status(500).json({
+        ok: false,
+        message: err.message,
+        code: err.code,
+        command: err.command,
+      });
+    }
+  });
 }
 
 module.exports = app;

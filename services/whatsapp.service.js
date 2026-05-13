@@ -82,10 +82,9 @@ async function sendReminderWhatsApp(reminderId, appointment, confirmationLink, t
 
     return data;
   } catch (err) {
-    await supabase
-      .from('reminders')
-      .update({ status: 'failed' })
-      .eq('id', reminderId);
+    // Don't mark as failed here — Bull will retry up to the configured attempts.
+    // The processor's 'failed' event handler marks it failed only after all retries
+    // are exhausted, preventing a successful retry from leaving status as 'failed'.
     throw err;
   }
 }

@@ -2,11 +2,17 @@ const client = require('../config/twilio');
 const supabase = require('../config/supabase');
 
 async function sendSms({ to, message }) {
-  return await client.messages.create({
+  const payload = {
     body: message,
     from: process.env.TWILIO_PHONE_NUMBER,
     to,
-  });
+  };
+
+  if (process.env.BACKEND_URL) {
+    payload.statusCallback = `${process.env.BACKEND_URL}/api/webhooks/twilio/sms-status`;
+  }
+
+  return await client.messages.create(payload);
 }
 
 function buildMessage(contactName, scheduledAt, notes, confirmationLink) {
@@ -25,14 +31,21 @@ async function sendReminderSms(reminderId, appointment, confirmationLink) {
   const phone = contact.phone.startsWith('+') ? contact.phone : `+91${contact.phone}`;
 
   try {
-    await sendSms({ to: phone, message });
+    const twilioMessage = await sendSms({ to: phone, message });
 
     const { data, error } = await supabase
       .from('reminders')
-      .update({ status: 'sent', sent_at: new Date().toISOString() })
+      .update({
+        status: 'pending',
+        provider_message_id: twilioMessage.sid,
+        provider_status: twilioMessage.status || 'queued',
+        provider_error_code: null,
+      })
       .eq('id', reminderId);
 
-    if (error) throw error;
+    if (error) {
+      console.warn(`⚠️ SMS sent but reminder metadata update failed for ${reminderId}:`, error.message);
+    }
     return data;
   } catch (err) {
     // Log Twilio-specific error details to help diagnose delivery failures
