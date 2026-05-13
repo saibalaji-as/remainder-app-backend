@@ -3,6 +3,10 @@ const templateService = require('../services/template.service');
 const sseManager = require('../sse.manager');
 const supabase = require('../config/supabase');
 
+function shortErrorMessage(err) {
+  return String(err?.message || err || 'Unknown email error').slice(0, 500);
+}
+
 /**
  * Creates a fresh Nodemailer transporter using current env vars.
  * Called per-send so credentials are always read from the live process env.
@@ -112,16 +116,33 @@ async function sendReminderEmail({ to, contactName, scheduledAt, notes, tenantId
       sseManager.emit(tenantId, 'email-sent', { reminderId, contactName, appointmentTitle });
     }
 
-    // Mark reminder as sent
+    // Mark reminder as accepted by the email provider. For email, providers usually
+    // accept first and report bounces later through provider dashboards/webhooks.
     if (reminderId) {
       await supabase
         .from('reminders')
-        .update({ status: 'sent', sent_at: new Date().toISOString() })
+        .update({
+          status: 'sent',
+          sent_at: new Date().toISOString(),
+          provider_message_id: result?.id || result?.messageId || null,
+          provider_status: process.env.RESEND_API_KEY ? 'resend_accepted' : 'smtp_accepted',
+          provider_error_code: null,
+        })
         .eq('id', reminderId);
     }
 
     return result;
   } catch (err) {
+    if (reminderId) {
+      await supabase
+        .from('reminders')
+        .update({
+          provider_status: process.env.RESEND_API_KEY ? 'resend_failed_attempt' : 'smtp_failed_attempt',
+          provider_error_code: shortErrorMessage(err),
+        })
+        .eq('id', reminderId);
+    }
+
     // Don't mark as failed here — Bull will retry up to the configured attempts.
     // The processor's 'failed' event handler marks it failed only after all retries
     // are exhausted, preventing a successful retry from leaving status as 'failed'.

@@ -98,7 +98,11 @@ reminderQueue.on('failed', async (job, err) => {
   if (job.attemptsMade >= job.opts.attempts) {
     await supabase
       .from('reminders')
-      .update({ status: 'failed' })
+      .update({
+        status: 'failed',
+        provider_status: `${job.data?.channel || 'reminder'}_failed`,
+        provider_error_code: String(err.message || err).slice(0, 500),
+      })
       .eq('id', job.data?.reminderId);
   }
 });
